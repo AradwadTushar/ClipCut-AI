@@ -1,4 +1,4 @@
-# 🎬 ClipCut AI Studio
+# ClipCut AI Studio
 
 <div align="center">
 
@@ -13,32 +13,32 @@ Transform long-form YouTube videos and podcasts into captivating 9:16 vertical c
 [![Tailwind CSS 4](https://img.shields.io/badge/Tailwind-CSS%204-indigo.svg)](https://tailwindcss.com/)
 [![MCP Protocol](https://img.shields.io/badge/MCP-Claude%20Desktop%20Stdio-orange.svg)](https://modelcontextprotocol.io/)
 
-[Key Features](#-key-features) •
-[Architecture](#-system-architecture) •
-[The 3 Pipelines](#-the-3-video-generation-pipelines) •
-[Claude Desktop MCP](#-directing-via-claude-desktop-mcp) •
-[Smart Posting Cadence](#-smart-posting-cadence--retention-scheduler) •
-[Quickstart](#-quickstart--installation) •
-[License](#-credits--license)
+[Key Features](#key-features) •
+[Architecture](#system-architecture) •
+[The 3 Pipelines](#the-3-video-generation-pipelines) •
+[Claude Desktop MCP](#directing-via-claude-desktop-mcp) •
+[Smart Posting Cadence](#smart-posting-cadence--retention-scheduler) •
+[Quickstart](#quickstart--installation) •
+[License](#credits--license)
 
 </div>
 
 ---
 
-## 🌟 Key Features
+## Key Features
 
-- ⚡ **3 Dedicated Production Pipelines:** Choose from Highlight Extraction (P1), 60–90s+ Multi-Angle Story Recap with 100% clean studio audio (P2), or Viral Hybrid Teaser Hook Injection (P3).
-- 🤖 **Dual-Director Architecture:** Generate autonomously via Google Gemini Flash or step into Director Mode via Claude Desktop through the local Model Context Protocol (MCP) server.
-- 🎨 **Modern Hormozi & Neon Captions:** Word-by-word animated ASS subtitles (`Hormozi Punch`, `Neon Gold`, `Bold Pop`, `Karaoke Fill`) with precise sub-millisecond timestamps.
-- 🎙️ **Neural Voice Engine:** Integrated Edge Neural TTS with sub-millisecond word boundaries and diverse expressive voice personas (`Energetic`, `Narrator`, `Storyteller`).
-- 🎯 **Dynamic Scene-Aware Reframing:** Active speaker tracking (MediaPipe FaceMesh), Split-Screen Gamer layout (35% Facecam + 65% Gameplay), and 1.35x Zoom-Fit.
-- 📅 **Algorithmic Posting Cadence:** Calculates high-retention audience windows (Midday Lunch 12:00 PM, Commute 5:30 PM, Night Prime 8:30 PM) with a strict 3 Shorts/day cap to protect channel authority.
-- 🛡️ **Human-in-the-Loop Safe YouTube Publishing:** Mandatory user consent gate, automatic original creator fair-use attribution, and chunked resumable video uploads.
-- 💻 **100% Local Hardware Acceleration:** Faster-Whisper, PyTorch, cuBLAS 12, cuDNN 12, and NVENC/libx264 hardware encoding.
+- **3 Dedicated Production Pipelines:** Choose from Highlight Extraction (P1), 60–90s+ Multi-Angle Story Recap with 100% clean studio audio (P2), or Viral Hybrid Teaser Hook Injection (P3).
+- **Dual-Director Architecture:** Generate autonomously via Google Gemini Flash or step into Director Mode via Claude Desktop through the local Model Context Protocol (MCP) server.
+- **Modern Hormozi & Neon Captions:** Word-by-word animated ASS subtitles (`Hormozi Punch`, `Neon Gold`, `Bold Pop`, `Karaoke Fill`) with precise sub-millisecond timestamps.
+- **Neural Voice Engine:** Integrated Edge Neural TTS with sub-millisecond word boundaries and diverse expressive voice personas (`Energetic`, `Narrator`, `Storyteller`).
+- **Dynamic Scene-Aware Reframing:** Active speaker tracking (MediaPipe FaceMesh), Split-Screen Gamer layout (35% Facecam + 65% Gameplay), and 1.35x Zoom-Fit.
+- **Algorithmic Posting Cadence:** Calculates high-retention audience windows (Midday Lunch 12:00 PM, Commute 5:30 PM, Night Prime 8:30 PM) with a strict 3 Shorts/day cap to protect channel authority.
+- **Human-in-the-Loop Safe YouTube Publishing:** Mandatory user consent gate, automatic original creator fair-use attribution, and chunked resumable video uploads.
+- **100% Local Hardware Acceleration:** Faster-Whisper, PyTorch, cuBLAS 12, cuDNN 12, and NVENC/libx264 hardware encoding.
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 ClipCut AI is engineered with a modular backend powered by FastAPI and SQLite, coupled with a high-performance React 19 SPA and a local MCP stdio server.
 
@@ -77,7 +77,7 @@ flowchart TD
 
 ---
 
-## ⚡ The 3 Video Generation Pipelines
+## The 3 Video Generation Pipelines
 
 ### Pipeline 1: Highlight Extraction & Scene-Aware Reframing
 - **Duration:** 15–60 seconds
@@ -103,7 +103,7 @@ flowchart TD
 
 ---
 
-## 🤖 Directing via Claude Desktop (MCP)
+## Directing via Claude Desktop (MCP)
 
 ClipCut AI features a local **Model Context Protocol (MCP)** server over standard stdio transport, allowing you to use Claude Desktop as your executive video director.
 
@@ -145,7 +145,7 @@ Add the following to your `claude_desktop_config.json`:
 
 ---
 
-## 📅 Smart Posting Cadence & Retention Scheduler
+## Smart Posting Cadence & Retention Scheduler
 
 To protect your channel from algorithmic spam penalties caused by erratic bulk uploads (e.g. uploading 50 shorts in an hour), ClipCut AI implements an algorithmic schedule manager:
 
@@ -157,11 +157,11 @@ To protect your channel from algorithmic spam penalties caused by erratic bulk u
 
 - **Dynamic Inspection:** Scans SQLite database for existing uploads.
 - **Auto-Advancement:** If today's 3 slots are occupied or passed, automatically reserves tomorrow's earliest prime slot.
-- **1-Click Apply:** Click **"⚡ Apply Optimal Slot"** inside the publish modal to auto-populate the scheduled release time.
+- **1-Click Apply:** Click **"Apply Optimal Slot"** inside the publish modal to auto-populate the scheduled release time.
 
 ---
 
-## 🛡️ Fair-Use Attribution & Safe Publishing
+## Fair-Use Attribution & Safe Publishing
 
 In strict compliance with creator copyright and platform policies:
 - **Mandatory Interactive Consent:** AI never auto-publishes without human sign-off.
@@ -170,9 +170,9 @@ In strict compliance with creator copyright and platform policies:
   Highlight from: $1 vs $1,000,000,000 Yacht!
   ----------------------------------------
   Credit to Original Creator:
-  🎬 Video: "$1 vs $1,000,000,000 Yacht!"
-  👤 Creator: MrBeast
-  🔗 Watch Original: https://youtube.com/watch?v=...
+  Video: "$1 vs $1,000,000,000 Yacht!"
+  Creator: MrBeast
+  Watch Original: https://youtube.com/watch?v=...
   Transformed under Fair Use for educational recap, analysis, and commentary.
   ----------------------------------------
   #shorts #viral #recap #highlights
@@ -180,7 +180,7 @@ In strict compliance with creator copyright and platform policies:
 
 ---
 
-## 🚀 Quickstart & Installation
+## Quickstart & Installation
 
 ### Prerequisites
 1. **Python 3.11** (Required for MediaPipe & PyTorch compatibility).
@@ -221,7 +221,7 @@ Open **`http://localhost:8000`** in your browser.
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```text
 ClipCut-AI/
@@ -259,7 +259,7 @@ ClipCut-AI/
 
 ---
 
-## 📜 Credits & License
+## Credits & License
 
 - **Core Engine:** Built upon and adapted from the open-source [AutoClip](https://github.com/artbyjazi/autoclip) project by **Jad Ghazi**.
 - **Extensions & Enhancements:** Multi-pipeline architecture (Story Recap, Hybrid Hook), Neural Voice Engine, Claude Desktop MCP, YouTube Smart Scheduler, and ClipCut Studio UI created by **Tushar Aradwad**.
