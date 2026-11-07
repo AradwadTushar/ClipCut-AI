@@ -29,6 +29,9 @@ from .croppath import (
     CropSegment,
     Strategy,
     centre_crop,
+    fit_crop,
+    split_crop,
+    podcast_split_crop,
     target_crop_size,
 )
 from .faces import FaceDetectionUnavailable, FaceObservation, sample_faces
@@ -45,6 +48,10 @@ __all__ = [
     "ReframeConfig",
     "Strategy",
     "build_crop_path",
+    "centre_crop",
+    "fit_crop",
+    "split_crop",
+    "podcast_split_crop",
 ]
 
 #: Where the eye line sits within the crop, as a fraction of crop height.
@@ -73,6 +80,13 @@ class ReframeConfig:
     smoothing: SmoothingConfig | None = None
     #: Skip face detection entirely and centre-crop everything.
     centre_only: bool = False
+    #: Framing layout mode:
+    #: - "auto": Face track if faces found, else blur_fit (preserves screenshots/gameplay).
+    #: - "blur_fit": Always preserve whole 16:9 frame centered over blurred background.
+    #: - "face_track": Always attempt face track, fallback to centre crop.
+    #: - "centre": Pure static centre crop.
+    #: - "podcast_split": Stacked 50/50 dual-speaker split screen (Speaker 1 top + Speaker 2 bottom).
+    layout: str = "auto"
 
 
 def build_crop_path(
@@ -85,8 +99,9 @@ def build_crop_path(
 ) -> CropPath:
     """Compute the crop path for one clip.
 
-    Falls back to a centred crop whenever face detection is unavailable or finds
-    nothing — a centre crop is an acceptable result, an exception is not.
+    Falls back to a centred crop or blur_fit whenever face detection is
+    unavailable or finds nothing — a valid crop is an acceptable result, an
+    exception is not.
 
     Preconditions:
         video exists; 0 <= start_s < end_s <= source duration.
@@ -101,7 +116,51 @@ def build_crop_path(
     source_w, source_h = info.width, info.height
     crop_w, crop_h = target_crop_size(source_w, source_h, config.aspect_w, config.aspect_h)
 
-    if config.centre_only:
+    if config.layout == "podcast_split":
+        s1_x, s2_x = None, None
+        try:
+            obs = sample_faces(video, start_s=start_s, end_s=end_s, sample_fps=config.sample_fps)
+            if obs:
+                trks = build_tracks(obs)
+                if len(trks) >= 2:
+                    track_positions = []
+                    for t in trks:
+                        t_obs = t.observations_between(start_s, end_s)
+                        if t_obs:
+                            mean_x = sum(o.cx for o in t_obs) / len(t_obs)
+                            track_positions.append((mean_x, t))
+                    track_positions.sort(key=lambda item: item[0])
+                    if len(track_positions) >= 2:
+                        s1_x = track_positions[0][0]
+                        s2_x = track_positions[-1][0]
+        except Exception as e:
+            log.warning("Could not detect speakers for podcast_split: %s", e)
+        return podcast_split_crop(
+            source_w,
+            source_h,
+            duration,
+            aspect_w=config.aspect_w,
+            aspect_h=config.aspect_h,
+            speaker1_x=s1_x,
+            speaker2_x=s2_x,
+        )
+
+    if config.layout == "split_screen":
+        return split_crop(
+            source_w, source_h, duration, aspect_w=config.aspect_w, aspect_h=config.aspect_h
+        )
+
+    if config.layout == "zoom_fit":
+        return fit_crop(
+            source_w, source_h, duration, aspect_w=config.aspect_w, aspect_h=config.aspect_h, zoom=0.35
+        )
+
+    if config.layout == "blur_fit":
+        return fit_crop(
+            source_w, source_h, duration, aspect_w=config.aspect_w, aspect_h=config.aspect_h, zoom=0.0
+        )
+
+    if config.centre_only or config.layout == "centre":
         return centre_crop(
             source_w, source_h, duration, aspect_w=config.aspect_w, aspect_h=config.aspect_h
         )
@@ -111,7 +170,15 @@ def build_crop_path(
             video, start_s=start_s, end_s=end_s, sample_fps=config.sample_fps
         )
     except FaceDetectionUnavailable as exc:
-        log.warning("Face detection unavailable (%s); using a centre crop.", exc)
+        log.warning("Face detection unavailable (%s); selecting fallback layout.", exc)
+        if config.layout in ("auto", "zoom_fit"):
+            return fit_crop(
+                source_w, source_h, duration, aspect_w=config.aspect_w, aspect_h=config.aspect_h, zoom=0.35
+            )
+        if config.layout == "blur_fit":
+            return fit_crop(
+                source_w, source_h, duration, aspect_w=config.aspect_w, aspect_h=config.aspect_h, zoom=0.0
+            )
         return centre_crop(
             source_w,
             source_h,
@@ -122,7 +189,25 @@ def build_crop_path(
         )
 
     if not observations:
-        log.info("No faces detected in %s; using a centre crop.", video.name)
+        log.info("No faces detected in %s; using zoom_fit layout.", video.name)
+        if config.layout in ("auto", "zoom_fit"):
+            return fit_crop(
+                source_w,
+                source_h,
+                duration,
+                aspect_w=config.aspect_w,
+                aspect_h=config.aspect_h,
+                zoom=0.35,
+            )
+        if config.layout == "blur_fit":
+            return fit_crop(
+                source_w,
+                source_h,
+                duration,
+                aspect_w=config.aspect_w,
+                aspect_h=config.aspect_h,
+                zoom=0.0,
+            )
         return centre_crop(
             source_w,
             source_h,
@@ -368,6 +453,40 @@ def _wide_segment(
             strategy=Strategy.WIDE,
             fit=True,
         )
+
+    # Avoid centering on the empty dead space between two people!
+    # If subjects are separated across > 50% of crop width, frame the active or prominent speaker.
+    if len(visible) >= 2 and spread > crop_w * 0.50:
+        scored = [(t, t.mouth_activity(start_s, end_s)) for t in visible]
+        scored.sort(key=lambda s: s[1], reverse=True)
+        if scored[0][1] >= 0.0004:
+            return _track_segment(
+                scored[0][0],
+                start_s=start_s,
+                end_s=end_s,
+                source_w=source_w,
+                source_h=source_h,
+                crop_w=crop_w,
+                crop_h=crop_h,
+                config=ReframeConfig(),
+            )
+        prom_tracks = []
+        for t in visible:
+            t_obs = t.observations_between(start_s, end_s)
+            if t_obs:
+                prom_tracks.append((sum(o.width for o in t_obs) / len(t_obs), t))
+        if prom_tracks:
+            prom_tracks.sort(key=lambda item: item[0], reverse=True)
+            return _track_segment(
+                prom_tracks[0][1],
+                start_s=start_s,
+                end_s=end_s,
+                source_w=source_w,
+                source_h=source_h,
+                crop_w=crop_w,
+                crop_h=crop_h,
+                config=ReframeConfig(),
+            )
 
     centre_x = (left + right) / 2
     eye_y = sum(o.eye_y for o in observations) / len(observations)

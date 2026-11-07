@@ -17,9 +17,13 @@ from .models import (
     ClipStatus,
     Export,
     Job,
+    JobScript,
     JobStatus,
     Source,
     Transcript,
+    YouTubeAnalyticsSnapshot,
+    YouTubeChannel,
+    YouTubeUpload,
     utcnow,
 )
 
@@ -270,6 +274,35 @@ def replace_clips(job_id: str, clips: list[Clip]) -> list[Clip]:
     return clips
 
 
+def create_clip(clip: Clip) -> Clip:
+    """Insert a single clip record into the database."""
+    with connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO clips (id, job_id, rank, start_s, end_s, start_word, end_word,
+                               title, hook, score, reason, status, user_trimmed, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                clip.id,
+                clip.job_id,
+                clip.rank,
+                clip.start_s,
+                clip.end_s,
+                clip.start_word,
+                clip.end_word,
+                clip.title,
+                clip.hook,
+                clip.score,
+                clip.reason,
+                clip.status,
+                int(clip.user_trimmed),
+                clip.created_at,
+            ),
+        )
+    return clip
+
+
 def get_clip(clip_id: str) -> Clip | None:
     with connection() as conn:
         row = conn.execute("SELECT * FROM clips WHERE id = ?", (clip_id,)).fetchone()
@@ -363,8 +396,8 @@ def create_export(export: Export) -> Export:
     with connection() as conn:
         conn.execute(
             """
-            INSERT INTO exports (id, clip_id, path, ratio, style, size_bytes, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO exports (id, clip_id, path, ratio, style, size_bytes, job_id, pipeline_type, title, script_json, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 export.id,
@@ -373,6 +406,10 @@ def create_export(export: Export) -> Export:
                 export.ratio,
                 export.style,
                 export.size_bytes,
+                export.job_id,
+                export.pipeline_type,
+                export.title,
+                export.script_json,
                 export.created_at,
             ),
         )
@@ -391,3 +428,178 @@ def list_exports(clip_id: str) -> list[Export]:
             "SELECT * FROM exports WHERE clip_id = ? ORDER BY created_at DESC", (clip_id,)
         ).fetchall()
     return [Export.from_row(r) for r in rows]
+
+
+def list_exports_for_job(job_id: str) -> list[Export]:
+    with connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT e.* FROM exports e
+            LEFT JOIN clips c ON c.id = e.clip_id
+            WHERE e.job_id = ? OR c.job_id = ?
+            ORDER BY e.created_at DESC
+            """,
+            (job_id, job_id),
+        ).fetchall()
+    return [Export.from_row(r) for r in rows]
+
+
+# --------------------------------------------------------------------------
+# Job Scripts & Iteration History
+# --------------------------------------------------------------------------
+
+
+def create_job_script(script: JobScript) -> JobScript:
+    with connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO job_scripts (id, job_id, version, pipeline_type, angle_title, title, hook, script_json, source_agent, feedback, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                script.id,
+                script.job_id,
+                script.version,
+                script.pipeline_type,
+                script.angle_title,
+                script.title,
+                script.hook,
+                script.script_json,
+                script.source_agent,
+                script.feedback,
+                script.created_at,
+            ),
+        )
+    return script
+
+
+def list_job_scripts(job_id: str, pipeline_type: str | None = None) -> list[JobScript]:
+    with connection() as conn:
+        if pipeline_type:
+            rows = conn.execute(
+                "SELECT * FROM job_scripts WHERE job_id = ? AND pipeline_type = ? ORDER BY version DESC, created_at DESC",
+                (job_id, pipeline_type),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM job_scripts WHERE job_id = ? ORDER BY version DESC, created_at DESC",
+                (job_id,),
+            ).fetchall()
+    return [JobScript.from_row(r) for r in rows]
+
+
+def get_job_script(script_id: str) -> JobScript | None:
+    with connection() as conn:
+        row = conn.execute("SELECT * FROM job_scripts WHERE id = ?", (script_id,)).fetchone()
+    return JobScript.from_row(row) if row else None
+
+
+# --------------------------------------------------------------------------
+# YouTube Channels & Uploads
+# --------------------------------------------------------------------------
+
+
+def upsert_youtube_channel(channel: YouTubeChannel) -> YouTubeChannel:
+    with connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO youtube_channels (id, title, custom_url, profile_name, credentials_json, is_default, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                title = excluded.title,
+                custom_url = excluded.custom_url,
+                profile_name = excluded.profile_name,
+                credentials_json = excluded.credentials_json,
+                is_default = excluded.is_default,
+                updated_at = excluded.updated_at
+            """,
+            (
+                channel.id,
+                channel.title,
+                channel.custom_url,
+                channel.profile_name,
+                channel.credentials_json,
+                1 if channel.is_default else 0,
+                channel.updated_at,
+            ),
+        )
+    return channel
+
+
+def get_youtube_channel(profile_name: str = "default") -> YouTubeChannel | None:
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM youtube_channels WHERE profile_name = ? LIMIT 1", (profile_name,)
+        ).fetchone()
+        if not row and profile_name == "default":
+            row = conn.execute("SELECT * FROM youtube_channels ORDER BY is_default DESC, updated_at DESC LIMIT 1").fetchone()
+    return YouTubeChannel.from_row(row) if row else None
+
+
+def list_youtube_channels() -> list[YouTubeChannel]:
+    with connection() as conn:
+        rows = conn.execute("SELECT * FROM youtube_channels ORDER BY is_default DESC, title ASC").fetchall()
+    return [YouTubeChannel.from_row(r) for r in rows]
+
+
+def create_youtube_upload(upload: YouTubeUpload) -> YouTubeUpload:
+    with connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO youtube_uploads (id, export_id, job_id, video_id, channel_id, channel_title, title, status, scheduled_at, published_at, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                upload.id,
+                upload.export_id,
+                upload.job_id,
+                upload.video_id,
+                upload.channel_id,
+                upload.channel_title,
+                upload.title,
+                upload.status,
+                upload.scheduled_at,
+                upload.published_at,
+                upload.created_at,
+            ),
+        )
+    return upload
+
+
+def list_all_youtube_uploads(limit: int = 100) -> list[YouTubeUpload]:
+    with connection() as conn:
+        rows = conn.execute("SELECT * FROM youtube_uploads ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+    return [YouTubeUpload.from_row(r) for r in rows]
+
+
+def list_youtube_uploads_for_job(job_id: str) -> list[YouTubeUpload]:
+    with connection() as conn:
+        rows = conn.execute("SELECT * FROM youtube_uploads WHERE job_id = ? ORDER BY created_at DESC", (job_id,)).fetchall()
+    return [YouTubeUpload.from_row(r) for r in rows]
+
+
+def save_youtube_analytics_snapshot(snapshot: YouTubeAnalyticsSnapshot) -> YouTubeAnalyticsSnapshot:
+    with connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO youtube_analytics_snapshots (id, channel_id, period_days, data_json, fetched_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                snapshot.id,
+                snapshot.channel_id,
+                snapshot.period_days,
+                snapshot.data_json,
+                snapshot.fetched_at,
+            ),
+        )
+    return snapshot
+
+
+def get_latest_youtube_analytics(channel_id: str) -> YouTubeAnalyticsSnapshot | None:
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM youtube_analytics_snapshots WHERE channel_id = ? ORDER BY fetched_at DESC LIMIT 1",
+            (channel_id,),
+        ).fetchone()
+    return YouTubeAnalyticsSnapshot.from_row(row) if row else None

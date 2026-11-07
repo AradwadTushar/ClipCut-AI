@@ -109,8 +109,10 @@ def ingest_youtube(
         "no_warnings": True,
         "noprogress": True,
         "progress_hooks": [hook],
-        "retries": 3,
-        "fragment_retries": 3,
+        "retries": 5,
+        "fragment_retries": 5,
+        "http_chunk_size": 10485760,
+        "concurrent_fragment_downloads": 5,
     }
     if settings.cookies_from_browser:
         # yt-dlp expects a tuple; only the browser name is required.

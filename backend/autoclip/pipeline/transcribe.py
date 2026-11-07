@@ -119,20 +119,33 @@ def transcribe(
         compute_type,
     )
 
-    try:
-        model = WhisperModel(settings.model, device=device, compute_type=compute_type)
-    except Exception as exc:
-        raise _model_load_error(exc, device, compute_type) from exc
+    import itertools
 
-    segments_iter, info = model.transcribe(
-        str(audio),
-        language=settings.language or None,
-        word_timestamps=True,
-        vad_filter=True,
-        # Trims long silences before decoding, which both speeds things up and
-        # stops Whisper hallucinating text into empty audio.
-        vad_parameters={"min_silence_duration_ms": 500},
-    )
+    def _init_and_transcribe(dev: str, comp: str):
+        m = WhisperModel(settings.model, device=dev, compute_type=comp)
+        s_iter, inf = m.transcribe(
+            str(audio),
+            language=settings.language or None,
+            word_timestamps=True,
+            vad_filter=True,
+            vad_parameters={"min_silence_duration_ms": 500},
+        )
+        # Pull the first segment to verify inference works without missing DLL errors
+        first = next(s_iter, None)
+        return m, s_iter, inf, first
+
+    try:
+        model, segments_iter, info, first_segment = _init_and_transcribe(device, compute_type)
+    except Exception as exc:
+        if device == "cuda":
+            log.warning("GPU Whisper inference failed (%s); falling back to CPU int8.", exc)
+            device, compute_type = "cpu", "int8"
+            try:
+                model, segments_iter, info, first_segment = _init_and_transcribe(device, compute_type)
+            except Exception as cpu_exc:
+                raise _model_load_error(cpu_exc, device, compute_type) from cpu_exc
+        else:
+            raise _model_load_error(exc, device, compute_type) from exc
 
     total = duration_s or getattr(info, "duration", 0.0) or 0.0
     transcript = Transcript(
@@ -141,7 +154,13 @@ def transcribe(
         source="whisper",
     )
 
-    for segment in segments_iter:
+    all_segments = (
+        itertools.chain([first_segment], segments_iter)
+        if first_segment is not None
+        else segments_iter
+    )
+
+    for segment in all_segments:
         if cancelled is not None and cancelled():
             raise TranscriptionError("Transcription cancelled.")
 

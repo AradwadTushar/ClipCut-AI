@@ -76,6 +76,22 @@ class TestCentreCrop:
         assert path.duration_s == 42.5
 
 
+class TestSplitCrop:
+    def test_produces_split_segment(self) -> None:
+        path = croppath.split_crop(1920, 1080, 30.0)
+        assert len(path.segments) == 1
+        segment = path.segments[0]
+        assert segment.split is True
+        assert segment.strategy == Strategy.SPLIT
+        assert segment.duration_s == 30.0
+
+    def test_serialization_roundtrip(self) -> None:
+        path = croppath.split_crop(1920, 1080, 15.0)
+        roundtripped = croppath.CropPath.from_dict(path.to_dict())
+        assert roundtripped.segments[0].split is True
+        assert roundtripped.segments[0].strategy == Strategy.SPLIT
+
+
 class TestOneEuroFilter:
     def test_suppresses_stationary_jitter(self) -> None:
         # A still subject with +/-5px detection noise must not move the crop.

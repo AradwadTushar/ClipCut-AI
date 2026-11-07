@@ -194,10 +194,15 @@ class Export:
     ratio: str = "9:16"
     style: str = "bold_pop"
     size_bytes: int = 0
+    job_id: str | None = None
+    pipeline_type: str = "pipeline_1"
+    title: str = ""
+    script_json: str | None = None
     created_at: str = field(default_factory=utcnow)
 
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> Export:
+        keys = row.keys()
         return cls(
             id=row["id"],
             clip_id=row["clip_id"],
@@ -205,5 +210,113 @@ class Export:
             ratio=row["ratio"],
             style=row["style"],
             size_bytes=row["size_bytes"],
+            job_id=row["job_id"] if "job_id" in keys else None,
+            pipeline_type=row["pipeline_type"] if "pipeline_type" in keys else "pipeline_1",
+            title=row["title"] if "title" in keys else "",
+            script_json=row["script_json"] if "script_json" in keys else None,
             created_at=row["created_at"],
+        )
+
+
+@dataclass
+class JobScript:
+    id: str
+    job_id: str
+    version: int = 1
+    pipeline_type: str = "pipeline_2"
+    angle_title: str = ""
+    title: str = ""
+    hook: str = ""
+    script_json: str = "{}"
+    source_agent: str = "gemini"
+    feedback: str = ""
+    created_at: str = field(default_factory=utcnow)
+
+    @classmethod
+    def from_row(cls, row: sqlite3.Row) -> JobScript:
+        return cls(
+            id=row["id"],
+            job_id=row["job_id"],
+            version=row["version"],
+            pipeline_type=row["pipeline_type"],
+            angle_title=row["angle_title"],
+            title=row["title"],
+            hook=row["hook"],
+            script_json=row["script_json"],
+            source_agent=row["source_agent"],
+            feedback=row["feedback"],
+            created_at=row["created_at"],
+        )
+
+
+@dataclass
+class YouTubeChannel:
+    id: str
+    title: str
+    custom_url: str = ""
+    profile_name: str = "default"
+    credentials_json: str = ""
+    is_default: bool = True
+    updated_at: str = field(default_factory=utcnow)
+
+    @classmethod
+    def from_row(cls, row: sqlite3.Row) -> YouTubeChannel:
+        return cls(
+            id=row["id"],
+            title=row["title"],
+            custom_url=row["custom_url"],
+            profile_name=row["profile_name"],
+            credentials_json=row["credentials_json"],
+            is_default=bool(row["is_default"]),
+            updated_at=row["updated_at"],
+        )
+
+
+@dataclass
+class YouTubeUpload:
+    id: str
+    export_id: str
+    job_id: str
+    video_id: str
+    channel_id: str
+    channel_title: str = ""
+    title: str = ""
+    status: str = "uploaded"  # 'scheduled', 'uploaded', 'failed'
+    scheduled_at: str | None = None
+    published_at: str | None = None
+    created_at: str = field(default_factory=utcnow)
+
+    @classmethod
+    def from_row(cls, row: sqlite3.Row) -> YouTubeUpload:
+        return cls(
+            id=row["id"],
+            export_id=row["export_id"],
+            job_id=row["job_id"],
+            video_id=row["video_id"],
+            channel_id=row["channel_id"],
+            channel_title=row["channel_title"],
+            title=row["title"],
+            status=row["status"],
+            scheduled_at=row["scheduled_at"],
+            published_at=row["published_at"],
+            created_at=row["created_at"],
+        )
+
+
+@dataclass
+class YouTubeAnalyticsSnapshot:
+    id: str
+    channel_id: str
+    period_days: int = 30
+    data_json: str = "{}"
+    fetched_at: str = field(default_factory=utcnow)
+
+    @classmethod
+    def from_row(cls, row: sqlite3.Row) -> YouTubeAnalyticsSnapshot:
+        return cls(
+            id=row["id"],
+            channel_id=row["channel_id"],
+            period_days=row["period_days"],
+            data_json=row["data_json"],
+            fetched_at=row["fetched_at"],
         )

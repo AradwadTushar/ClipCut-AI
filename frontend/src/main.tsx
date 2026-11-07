@@ -4,7 +4,10 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 
 import { App } from './App'
 import './index.css'
-import { Ingest } from './pages/Ingest'
+import { Landing } from './pages/Landing'
+import { Create } from './pages/Create'
+import { History } from './pages/History'
+import { Analytics } from './pages/Analytics'
 import { JobProgress } from './pages/JobProgress'
 import { Review } from './pages/Review'
 import { Settings } from './pages/Settings'
@@ -14,7 +17,10 @@ const router = createBrowserRouter([
     path: '/',
     element: <App />,
     children: [
-      { index: true, element: <Ingest /> },
+      { index: true, element: <Landing /> },
+      { path: 'create', element: <Create /> },
+      { path: 'history', element: <History /> },
+      { path: 'analytics', element: <Analytics /> },
       { path: 'jobs/:jobId', element: <JobProgress /> },
       { path: 'jobs/:jobId/clips', element: <Review /> },
       { path: 'settings', element: <Settings /> },

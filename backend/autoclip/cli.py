@@ -693,6 +693,64 @@ def styles() -> None:
     console.print(table)
 
 
+@app.command()
+def mcp() -> None:
+    """Run the AutoClip stdio MCP server for Claude Desktop and Antigravity."""
+    from .mcp.server import main as run_mcp
+
+    run_mcp()
+
+
+@app.command("youtube-connect")
+def youtube_connect(
+    secrets: Path = typer.Option(None, "--secrets", "-s", help="Path to client_secrets.json"),
+    profile: str = typer.Option("default", "--profile", "-p", help="Channel profile name (default, gaming, viral, etc.)"),
+    port: int = typer.Option(8085, "--port", help="Local redirect port for OAuth"),
+) -> None:
+    """Connect a YouTube channel via Google OAuth 2.0 Desktop flow."""
+    from .pipeline import youtube
+
+    console.print(f"[bold cyan]Connecting YouTube channel for profile '{profile}'...[/bold cyan]")
+    found_secrets = youtube.get_client_secrets_path(secrets)
+    if not found_secrets.exists():
+        console.print(
+            f"[red]Missing client_secrets.json.[/red]\n"
+            f"Searched: [yellow]{found_secrets}[/yellow]\n\n"
+            "To connect your YouTube channel:\n"
+            "1. Go to Google Cloud Console (https://console.cloud.google.com)\n"
+            "2. Enable 'YouTube Data API v3' and 'YouTube Analytics API'\n"
+            "3. Create OAuth Client ID (Application type: Desktop App)\n"
+            "4. Download JSON and save to ~/.autoclip/client_secrets.json (or your Downloads folder)"
+        )
+        raise typer.Exit(code=1)
+
+    console.print(f"Using client secrets from: [green]{found_secrets}[/green]")
+    console.print("Opening browser for Google authorization...")
+    status = youtube.start_oauth_flow(client_secrets_path=found_secrets, profile_name=profile, port=port)
+    if status.connected:
+        console.print(f"[bold green]SUCCESS:[/bold green] Connected to [bold]{status.title}[/bold] ({status.subscriber_count:,} subscribers)")
+    else:
+        console.print(f"[bold red]Connection failed:[/bold red] {status.message}")
+        raise typer.Exit(code=1)
+
+
+@app.command("youtube-status")
+def youtube_status(
+    profile: str = typer.Option("default", "--profile", "-p", help="Profile name"),
+) -> None:
+    """Check YouTube channel connection and subscriber stats."""
+    from .pipeline import youtube
+
+    status = youtube.get_channel_status(profile)
+    if status.connected:
+        console.print(f"[green]Connected[/green] to [bold]{status.title}[/bold] (Profile: [cyan]{profile}[/cyan])")
+        console.print(f"Channel ID: {status.channel_id}")
+        console.print(f"Subscribers: {status.subscriber_count:,} | Videos: {status.video_count:,} | Views: {status.view_count:,}")
+    else:
+        console.print(f"[yellow]Not connected[/yellow] (Profile: [cyan]{profile}[/cyan])")
+        console.print(f"Status: {status.message}")
+
+
 def _format_duration(seconds: float) -> str:
     minutes, secs = divmod(int(seconds), 60)
     hours, minutes = divmod(minutes, 60)

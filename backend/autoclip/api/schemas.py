@@ -203,6 +203,32 @@ class ExportRequestIn(BaseModel):
     ratio: Literal["9:16", "1:1", "16:9"] = "9:16"
     style: str = "bold_pop"
     write_srt: bool = False
+    layout: Literal["auto", "zoom_fit", "blur_fit", "face_track", "centre", "split_screen", "podcast_split"] = "auto"
+
+
+class HybridExportIn(BaseModel):
+    hook_text: str | None = None
+    outro_text: str | None = None
+    voice: str = "energetic"
+    rate: str = "+15%"
+    style: str = "hormozi"
+    layout: Literal["auto", "zoom_fit", "blur_fit", "face_track", "centre", "split_screen", "podcast_split"] = "auto"
+    ratio: Literal["9:16", "1:1", "16:9"] = "9:16"
+    hook_mode: Literal["prepend_broll", "overlay"] = "prepend_broll"
+    hook_broll_start_s: float | None = None
+    hook_duck_volume: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
+class SummarizeJobIn(BaseModel):
+    instructions: str = ""
+    voice: str = "narrator"
+    rate: str = "+15%"
+    caption_style: str = "hormozi"
+    ambient_volume: float = Field(default=0.0, ge=0.0, le=0.5)
+    ratio: Literal["9:16", "1:1", "16:9"] = "9:16"
+    target_duration: int = Field(default=60, ge=30, le=180)
+    provider: str | None = None
+    custom_script: dict[str, Any] | None = None
 
 
 class CaptionStyleOut(BaseModel):

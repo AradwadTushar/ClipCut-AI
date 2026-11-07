@@ -81,12 +81,14 @@ class TestColour:
 
 
 class TestPresets:
-    def test_all_four_presets_exist(self) -> None:
+    def test_all_presets_exist(self) -> None:
         assert set(captions.PRESETS) == {
             "bold_pop",
             "karaoke_fill",
             "clean_lower",
             "boxed",
+            "hormozi",
+            "neon_gold",
         }
 
     @pytest.mark.parametrize("key", list(captions.PRESETS))

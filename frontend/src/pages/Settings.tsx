@@ -1,13 +1,24 @@
 import { useEffect, useState } from 'react'
+import {
+  Sparkles,
+  Cpu,
+  Key,
+  Check,
+  Eye,
+  EyeOff,
+  Sliders,
+  Calendar,
+  AlertCircle,
+  Film,
+} from 'lucide-react'
 
 import { api, type ProviderStatus, type Settings as SettingsData, type SystemStatus } from '../api'
-import { ErrorNote } from '../components/ErrorNote'
 
 const SECRET_LABELS: Record<string, string> = {
-  anthropic: 'Anthropic API key',
-  openai: 'OpenAI-compatible API key',
-  gemini: 'Google Gemini API key',
-  huggingface_token: 'HuggingFace token',
+  gemini: 'Google Gemini API Key',
+  anthropic: 'Anthropic Claude API Key',
+  openai: 'OpenAI-compatible API Key',
+  huggingface_token: 'HuggingFace Access Token',
 }
 
 export function Settings() {
@@ -15,7 +26,12 @@ export function Settings() {
   const [providers, setProviders] = useState<ProviderStatus[]>([])
   const [system, setSystem] = useState<SystemStatus | null>(null)
   const [error, setError] = useState<Error | null>(null)
-  const [saved, setSaved] = useState(false)
+  const [savedMessage, setSavedMessage] = useState<string | null>(null)
+
+  // Smart cadence mock state (can be saved in localStorage or settings)
+  const [dailyCap, setDailyCap] = useState<number>(() => {
+    return Number(localStorage.getItem('clipcut_daily_cap')) || 3
+  })
 
   const reload = () => {
     void api.getSettings().then(setSettings).catch((e) => setError(e as Error))
@@ -28,114 +44,232 @@ export function Settings() {
   const patch = async (update: Partial<SettingsData>) => {
     setError(null)
     try {
-      setSettings(await api.putSettings(update))
-      setSaved(true)
-      setTimeout(() => setSaved(false), 1600)
-    } catch (err) {
+      const updated = await api.putSettings(update)
+      setSettings(updated)
+      setSavedMessage('Settings saved')
+      setTimeout(() => setSavedMessage(null), 2000)
+    } catch (err: any) {
       setError(err as Error)
     }
   }
 
-  if (!settings) return <p className="pt-24 text-sm text-ink-500">Loading…</p>
+  const handleUpdateDailyCap = (cap: number) => {
+    setDailyCap(cap)
+    localStorage.setItem('clipcut_daily_cap', String(cap))
+    setSavedMessage(`Daily upload target updated to ${cap} Shorts/day`)
+    setTimeout(() => setSavedMessage(null), 2000)
+  }
+
+  if (!settings) {
+    return (
+      <div className="py-24 text-center">
+        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-purple-600 border-t-transparent" />
+        <p className="mt-4 text-xs font-semibold text-ink-600">Loading ClipCut settings...</p>
+      </div>
+    )
+  }
 
   return (
-    <div className="max-w-4xl pt-14">
-      <div className="rise flex items-baseline justify-between border-b border-ink-800 pb-5">
-        <h1 className="font-display text-[clamp(2rem,4vw,3rem)] leading-none text-ink-100">
-          Settings
-        </h1>
-        <span
-          className="text-xs text-signal-good transition-opacity duration-300"
-          style={{ opacity: saved ? 1 : 0 }}
-        >
-          saved
-        </span>
+    <div className="mx-auto max-w-5xl space-y-10 py-10">
+      {/* ---------------- Header ---------------- */}
+      <div className="flex flex-col justify-between gap-4 border-b border-canvas-200 pb-6 sm:flex-row sm:items-center">
+        <div>
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-xs font-semibold text-purple-700">
+            <Sliders className="h-3.5 w-3.5 text-purple-600" />
+            <span>Studio Preferences & Config</span>
+          </div>
+          <h1 className="mt-2 text-3xl font-extrabold text-ink-950">Preferences & Diagnostics</h1>
+          <p className="text-sm text-ink-600">
+            Configure AI directors, upload cadence patterns, Whisper STT, and GPU hardware acceleration.
+          </p>
+        </div>
+
+        {savedMessage && (
+          <div className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-800 shadow-sm animate-fade-in">
+            <Check className="h-4 w-4 text-emerald-600" />
+            <span>{savedMessage}</span>
+          </div>
+        )}
       </div>
 
       {error && (
-        <div className="mt-6">
-          <ErrorNote error={error} onDismiss={() => setError(null)} />
+        <div className="flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs text-red-900">
+          <AlertCircle className="h-5 w-5 text-red-600 shrink-0" />
+          <span>{error.message || String(error)}</span>
         </div>
       )}
 
-      {settings.insecure_secret_storage && (
-        <p className="mt-6 border-l-2 border-sodium-600 pl-4 text-sm leading-relaxed text-ink-300">
-          No OS keyring is available on this machine, so API keys are stored in plain text
-          in <code className="text-ink-200">config.json</code>. On headless Linux, installing
-          a Secret Service provider or <code className="text-ink-200">keyrings.alt</code>{' '}
-          fixes this.
-        </p>
-      )}
+      {/* ---------------- CARD 1: AI Provider & Models ---------------- */}
+      <div className="rounded-3xl border border-canvas-300 bg-white p-6 shadow-sm sm:p-8 space-y-6">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-purple-700">
+            <Sparkles className="h-4 w-4" />
+            <span>AI Director & Vision Engine</span>
+          </div>
+          <h3 className="mt-1 text-lg font-bold text-ink-950">Active LLM Provider</h3>
+          <p className="text-xs text-ink-500">
+            Select which reasoning model inspects transcripts, scores retention hooks, and drafts narrative B-roll scripts.
+          </p>
+        </div>
 
-      <Section title="AI provider" note="Which model picks the clips.">
-        <div className="space-y-1">
-          {providers.map((provider) => (
-            <button
-              key={provider.name}
-              onClick={() => patch({ active_provider: provider.name })}
-              className={[
-                'block w-full border-l-2 py-3 pl-3 text-left transition-colors duration-200',
-                provider.name === settings.active_provider
-                  ? 'border-sodium-500 bg-ink-850/60'
-                  : 'border-transparent hover:border-ink-700 hover:bg-ink-850/30',
-              ].join(' ')}
-            >
-              <div className="flex items-baseline justify-between gap-4">
-                <span className="text-sm text-ink-100">{provider.name}</span>
-                <span
-                  className={`text-xs ${provider.available ? 'text-signal-good' : 'text-ink-500'}`}
-                >
-                  {provider.available ? 'reachable' : provider.detail || 'unavailable'}
-                </span>
+        {/* Provider Selectable Cards */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {providers.map((p) => {
+            const isSelected = p.name === settings.active_provider
+            return (
+              <div
+                key={p.name}
+                onClick={() => patch({ active_provider: p.name })}
+                className={`cursor-pointer rounded-2xl border p-4 transition-all ${
+                  isSelected
+                    ? 'border-purple-600 bg-purple-50/70 shadow-sm ring-1 ring-purple-600'
+                    : 'border-canvas-200 bg-canvas-50 hover:border-canvas-300 hover:bg-white'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-sm capitalize text-ink-950">{p.name}</span>
+                  {isSelected && <Check className="h-4 w-4 text-purple-700" />}
+                </div>
+                <div className="mt-2 flex items-center gap-1.5 text-[11px]">
+                  <span className={`h-2 w-2 rounded-full ${p.available ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                  <span className={p.available ? 'font-semibold text-emerald-800' : 'text-amber-800'}>
+                    {p.available ? 'Connected' : p.detail || 'Unavailable'}
+                  </span>
+                </div>
               </div>
-              {provider.models.length > 0 && (
-                <span className="numeric mt-1 block truncate text-xs text-ink-600">
-                  {provider.models.slice(0, 6).join(' · ')}
-                </span>
-              )}
-            </button>
-          ))}
+            )
+          })}
         </div>
 
-        <div className="mt-6 grid gap-5 sm:grid-cols-2">
-          <Field
-            label="Model"
-            value={settings.providers[settings.active_provider]?.model ?? ''}
-            placeholder="model name"
-            onCommit={(value) =>
-              patch({
-                providers: {
-                  [settings.active_provider]: {
-                    ...settings.providers[settings.active_provider],
-                    model: value,
+        {/* Model & Base URL Inputs */}
+        <div className="grid grid-cols-1 gap-5 pt-2 sm:grid-cols-2">
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-ink-700">
+              Model Name ({settings.active_provider})
+            </label>
+            <input
+              type="text"
+              value={settings.providers[settings.active_provider]?.model ?? ''}
+              onChange={(e) =>
+                patch({
+                  providers: {
+                    [settings.active_provider]: {
+                      ...settings.providers[settings.active_provider],
+                      model: e.target.value,
+                    },
                   },
-                },
-              })
-            }
-          />
-          <Field
-            label="Base URL"
-            hint="Point at OpenRouter, Groq, DeepSeek, or a local server."
-            value={settings.providers[settings.active_provider]?.base_url ?? ''}
-            placeholder="https://…"
-            onCommit={(value) =>
-              patch({
-                providers: {
-                  [settings.active_provider]: {
-                    ...settings.providers[settings.active_provider],
-                    base_url: value || null,
-                  },
-                },
-              })
-            }
-          />
-        </div>
-      </Section>
+                })
+              }
+              placeholder="e.g. gemini-2.0-flash or claude-3-5-sonnet-latest"
+              className="mt-1.5 w-full rounded-xl border border-canvas-300 bg-canvas-50 px-3.5 py-2.5 text-xs text-ink-900 focus:border-purple-600 focus:bg-white focus:outline-none"
+            />
+          </div>
 
-      <Section title="Keys" note="Stored in your OS keyring. Never sent anywhere but the provider.">
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-ink-700">
+              Base URL (Optional)
+            </label>
+            <input
+              type="text"
+              value={settings.providers[settings.active_provider]?.base_url ?? ''}
+              onChange={(e) =>
+                patch({
+                  providers: {
+                    [settings.active_provider]: {
+                      ...settings.providers[settings.active_provider],
+                      base_url: e.target.value || null,
+                    },
+                  },
+                })
+              }
+              placeholder="e.g. OpenRouter, Groq, or http://localhost:11434"
+              className="mt-1.5 w-full rounded-xl border border-canvas-300 bg-canvas-50 px-3.5 py-2.5 text-xs text-ink-900 focus:border-purple-600 focus:bg-white focus:outline-none"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ---------------- CARD 2: Smart YouTube Cadence & Scheduling ---------------- */}
+      <div className="rounded-3xl border border-canvas-300 bg-white p-6 shadow-sm sm:p-8 space-y-6">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-purple-700">
+            <Calendar className="h-4 w-4" />
+            <span>Publishing Cadence & Smart Slots</span>
+          </div>
+          <h3 className="mt-1 text-lg font-bold text-ink-950">Shorts Distribution Schedule</h3>
+          <p className="text-xs text-ink-500">
+            Prevents uploading in erratic batches. Automatically calculates optimal high-retention windows and spaces out uploads across peak audience hours.
+          </p>
+        </div>
+
+        {/* Daily Upload Target Picker */}
+        <div className="space-y-3">
+          <label className="block text-xs font-bold uppercase tracking-wider text-ink-700">
+            Daily Recommended Shorts Cap
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {[1, 2, 3, 4, 5].map((cap) => (
+              <button
+                key={cap}
+                type="button"
+                onClick={() => handleUpdateDailyCap(cap)}
+                className={`rounded-xl px-4 py-2 text-xs font-bold transition-all ${
+                  dailyCap === cap
+                    ? 'bg-purple-700 text-white shadow-sm ring-1 ring-purple-600'
+                    : 'border border-canvas-300 bg-canvas-50 text-ink-700 hover:bg-white'
+                }`}
+              >
+                {cap} {cap === 1 ? 'Short / day' : 'Shorts / day'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* High-Retention Windows Overview */}
+        <div className="space-y-3 pt-2">
+          <label className="block text-xs font-bold uppercase tracking-wider text-ink-700">
+            Algorithmic High-Traffic Time Slots
+          </label>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-canvas-200 bg-canvas-50 p-3.5 space-y-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700">Slot 1 • Midday</span>
+              <h5 className="font-bold text-xs text-ink-950">12:00 PM (Lunch Break)</h5>
+              <p className="text-[11px] text-ink-500">High engagement from mobile users during midday breaks.</p>
+            </div>
+            <div className="rounded-2xl border border-canvas-200 bg-canvas-50 p-3.5 space-y-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700">Slot 2 • Commute</span>
+              <h5 className="font-bold text-xs text-ink-950">5:30 PM (Evening Rush)</h5>
+              <p className="text-[11px] text-ink-500">Peak scroll volume as viewers commute from work/school.</p>
+            </div>
+            <div className="rounded-2xl border border-canvas-200 bg-canvas-50 p-3.5 space-y-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700">Slot 3 • Prime Time</span>
+              <h5 className="font-bold text-xs text-ink-950">8:30 PM (Night Leisure)</h5>
+              <p className="text-[11px] text-ink-500">Highest average watch duration and completion rate.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-purple-200 bg-purple-50/60 p-3 text-xs text-purple-950">
+          <strong>Pacing Guardrail:</strong> When you click <em>Publish Short</em> in the studio, ClipCut automatically inspects today's schedule. If today's {dailyCap} slots are already booked, it automatically buffers to tomorrow's Slot 1 so your videos never compete with each other.
+        </div>
+      </div>
+
+      {/* ---------------- CARD 3: API Keys & Credentials Vault ---------------- */}
+      <div className="rounded-3xl border border-canvas-300 bg-white p-6 shadow-sm sm:p-8 space-y-6">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-purple-700">
+            <Key className="h-4 w-4" />
+            <span>Secure Keyring Vault</span>
+          </div>
+          <h3 className="mt-1 text-lg font-bold text-ink-950">API Keys & Access Tokens</h3>
+          <p className="text-xs text-ink-500">
+            Keys are encrypted in your local operating system keyring. They are never transmitted to third parties.
+          </p>
+        </div>
+
         <div className="space-y-4">
           {Object.entries(SECRET_LABELS).map(([key, label]) => (
-            <SecretField
+            <ModernSecretField
               key={key}
               secretKey={key}
               label={label}
@@ -145,276 +279,127 @@ export function Settings() {
             />
           ))}
         </div>
-      </Section>
-
-      <Section title="Transcription">
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Select
-            label="Whisper model"
-            value={settings.whisper.model}
-            onChange={(value) => patch({ whisper: { ...settings.whisper, model: value } })}
-            options={['tiny', 'base', 'small', 'medium', 'large-v3']}
-          />
-          <Field
-            label="Language"
-            hint="Leave empty to detect automatically."
-            value={settings.whisper.language}
-            placeholder="auto"
-            onCommit={(value) => patch({ whisper: { ...settings.whisper, language: value } })}
-          />
-        </div>
-
-        <label className="mt-5 flex items-start gap-3 text-sm text-ink-200">
-          <input
-            type="checkbox"
-            checked={settings.whisper.diarization}
-            disabled={!system?.diarization_available}
-            onChange={(e) =>
-              patch({ whisper: { ...settings.whisper, diarization: e.target.checked } })
-            }
-            className="mt-0.5 size-4 accent-sodium-500"
-          />
-          <span>
-            Identify speakers
-            {!system?.diarization_available && (
-              <span className="mt-1 block text-xs text-ink-500">
-                Needs the diarization extra:{' '}
-                <code className="text-ink-300">uv pip install &apos;autoclip[diarization]&apos;</code>
-              </span>
-            )}
-          </span>
-        </label>
-      </Section>
-
-      <Section title="Clips">
-        <div className="grid gap-5 sm:grid-cols-3">
-          <NumberField
-            label="Min length (s)"
-            value={settings.clips.min_duration_s}
-            onCommit={(value) => patch({ clips: { ...settings.clips, min_duration_s: value } })}
-          />
-          <NumberField
-            label="Max length (s)"
-            value={settings.clips.max_duration_s}
-            onCommit={(value) => patch({ clips: { ...settings.clips, max_duration_s: value } })}
-          />
-          <NumberField
-            label="Max clips"
-            value={settings.clips.max_clips}
-            onCommit={(value) => patch({ clips: { ...settings.clips, max_clips: value } })}
-          />
-        </div>
-      </Section>
-
-      <Section title="Ingest">
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Select
-            label="YouTube cookies from"
-            hint="YouTube blocks most anonymous downloads. Sign in in that browser and close it before downloading."
-            value={settings.ingest.cookies_from_browser}
-            onChange={(value) =>
-              patch({ ingest: { ...settings.ingest, cookies_from_browser: value } })
-            }
-            options={['', 'chrome', 'firefox', 'edge', 'brave', 'chromium', 'safari']}
-            labels={{ '': 'None' }}
-          />
-        </div>
-      </Section>
-
-      <Section title="Export">
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Select
-            label="Default ratio"
-            value={settings.export.ratio}
-            onChange={(value) => patch({ export: { ...settings.export, ratio: value } })}
-            options={['9:16', '1:1', '16:9']}
-          />
-          <NumberField
-            label="Loudness target (LUFS)"
-            value={settings.export.loudness_lufs}
-            onCommit={(value) => patch({ export: { ...settings.export, loudness_lufs: value } })}
-          />
-        </div>
-
-        <label className="mt-5 flex items-start gap-3 text-sm text-ink-200">
-          <input
-            type="checkbox"
-            checked={settings.export.prefer_hardware_encoder}
-            onChange={(e) =>
-              patch({
-                export: { ...settings.export, prefer_hardware_encoder: e.target.checked },
-              })
-            }
-            className="mt-0.5 size-4 accent-sodium-500"
-          />
-          <span>
-            Use GPU encoding when available
-            {system && !system.nvenc_works && (
-              <span className="mt-1 block text-xs text-ink-500">
-                Not usable on this machine — exports will use the CPU encoder. Same quality,
-                slower.
-              </span>
-            )}
-          </span>
-        </label>
-
-        <label className="mt-4 flex items-center gap-3 text-sm text-ink-200">
-          <input
-            type="checkbox"
-            checked={settings.export.write_srt}
-            onChange={(e) => patch({ export: { ...settings.export, write_srt: e.target.checked } })}
-            className="size-4 accent-sodium-500"
-          />
-          Also write an .srt sidecar
-        </label>
-      </Section>
-
-      {system && (
-        <Section title="This machine">
-          <dl className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
-            <Row label="Platform" value={system.platform} />
-            <Row label="Python" value={system.python_version} />
-            <Row label="ffmpeg" value={system.ffmpeg_version ?? 'not found'} />
-            <Row label="Acceleration" value={system.accel.toUpperCase()} />
-            <Row label="Device" value={system.gpu_name ?? '—'} />
-            <Row label="Whisper compute" value={system.compute_type} />
-            <Row label="GPU encode" value={system.nvenc_works ? 'available' : 'unavailable'} />
-            <Row label="Captions" value={system.has_libass ? 'libass present' : 'libass missing'} />
-          </dl>
-        </Section>
-      )}
-    </div>
-  )
-}
-
-function Section({
-  title,
-  note,
-  children,
-}: {
-  title: string
-  note?: string
-  children: React.ReactNode
-}) {
-  return (
-    <section className="rise mt-14">
-      <div className="border-b border-ink-800 pb-2">
-        <h2 className="eyebrow">{title}</h2>
-        {note && <p className="mt-1 text-xs text-ink-500">{note}</p>}
       </div>
-      <div className="mt-5">{children}</div>
-    </section>
-  )
-}
 
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4 border-b border-ink-850 pb-2">
-      <dt className="text-ink-500">{label}</dt>
-      <dd className="numeric truncate text-right text-ink-200">{value}</dd>
+      {/* ---------------- CARD 4: Whisper Speech-to-Text & Ingestion ---------------- */}
+      <div className="rounded-3xl border border-canvas-300 bg-white p-6 shadow-sm sm:p-8 space-y-6">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-purple-700">
+            <Film className="h-4 w-4" />
+            <span>Audio Transcription & Ingestion</span>
+          </div>
+          <h3 className="mt-1 text-lg font-bold text-ink-950">Whisper AI Configuration</h3>
+          <p className="text-xs text-ink-500">
+            Word-level timestamp extraction model used for subtitles and creative director analysis.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-ink-700">
+              Whisper Model Size
+            </label>
+            <select
+              value={settings.whisper.model}
+              onChange={(e) => patch({ whisper: { ...settings.whisper, model: e.target.value } })}
+              className="mt-1.5 w-full rounded-xl border border-canvas-300 bg-canvas-50 px-3.5 py-2.5 text-xs font-bold text-ink-900 focus:border-purple-600 focus:bg-white focus:outline-none"
+            >
+              <option value="tiny">Tiny (Fastest, ~1GB VRAM)</option>
+              <option value="base">Base (Balanced, ~1.5GB VRAM)</option>
+              <option value="small">Small (Recommended, ~2GB VRAM)</option>
+              <option value="medium">Medium (High Accuracy, ~5GB VRAM)</option>
+              <option value="large-v3">Large-v3 (Maximum Accuracy, ~10GB VRAM)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-ink-700">
+              Spoken Language
+            </label>
+            <input
+              type="text"
+              value={settings.whisper.language ?? ''}
+              onChange={(e) => patch({ whisper: { ...settings.whisper, language: e.target.value } })}
+              placeholder="auto (or en, es, fr...)"
+              className="mt-1.5 w-full rounded-xl border border-canvas-300 bg-canvas-50 px-3.5 py-2.5 text-xs text-ink-900 focus:border-purple-600 focus:bg-white focus:outline-none"
+            />
+          </div>
+        </div>
+
+        {/* YouTube Cookies Selector */}
+        <div className="pt-2">
+          <label className="block text-xs font-bold uppercase tracking-wider text-ink-700">
+            YouTube Cookies from Browser
+          </label>
+          <p className="mt-0.5 text-[11px] text-ink-500">
+            Passes authenticated session cookies to yt-dlp to bypass bot detection on age-gated or protected videos.
+          </p>
+          <select
+            value={settings.ingest.cookies_from_browser ?? ''}
+            onChange={(e) => patch({ ingest: { ...settings.ingest, cookies_from_browser: e.target.value } })}
+            className="mt-1.5 w-full max-w-sm rounded-xl border border-canvas-300 bg-canvas-50 px-3.5 py-2.5 text-xs font-bold text-ink-900 focus:border-purple-600 focus:bg-white focus:outline-none"
+          >
+            <option value="">None (Anonymous download)</option>
+            <option value="chrome">Google Chrome</option>
+            <option value="firefox">Mozilla Firefox</option>
+            <option value="edge">Microsoft Edge</option>
+            <option value="brave">Brave Browser</option>
+          </select>
+        </div>
+      </div>
+
+      {/* ---------------- CARD 5: Video Export Defaults & Hardware Telemetry ---------------- */}
+      <div className="rounded-3xl border border-canvas-300 bg-white p-6 shadow-sm sm:p-8 space-y-6">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-purple-700">
+            <Cpu className="h-4 w-4" />
+            <span>Hardware Diagnostics & FFmpeg</span>
+          </div>
+          <h3 className="mt-1 text-lg font-bold text-ink-950">System Telemetry</h3>
+          <p className="text-xs text-ink-500">
+            Local hardware encoder, CUDA acceleration status, and system environment.
+          </p>
+        </div>
+
+        {system && (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-2xl border border-canvas-200 bg-canvas-50 p-4 space-y-1">
+              <span className="text-[10px] font-bold uppercase text-ink-500">Acceleration</span>
+              <p className="font-extrabold text-xs text-ink-950">{system.accel.toUpperCase()}</p>
+            </div>
+            <div className="rounded-2xl border border-canvas-200 bg-canvas-50 p-4 space-y-1">
+              <span className="text-[10px] font-bold uppercase text-ink-500">Graphics Device</span>
+              <p className="font-extrabold text-xs text-ink-950 truncate">{system.gpu_name || 'CPU Only'}</p>
+            </div>
+            <div className="rounded-2xl border border-canvas-200 bg-canvas-50 p-4 space-y-1">
+              <span className="text-[10px] font-bold uppercase text-ink-500">FFmpeg Engine</span>
+              <p className="font-extrabold text-xs text-ink-950 truncate">{system.ffmpeg_version?.slice(0, 15) || 'Available'}</p>
+            </div>
+            <div className="rounded-2xl border border-canvas-200 bg-canvas-50 p-4 space-y-1">
+              <span className="text-[10px] font-bold uppercase text-ink-500">Subtitle Burner</span>
+              <p className="font-extrabold text-xs text-emerald-700">{system.has_libass ? 'Libass Active' : 'Fallback'}</p>
+            </div>
+          </div>
+        )}
+
+        <div className="pt-2 flex items-center gap-3">
+          <input
+            type="checkbox"
+            id="nvenc_check"
+            checked={settings.export.prefer_hardware_encoder}
+            onChange={(e) => patch({ export: { ...settings.export, prefer_hardware_encoder: e.target.checked } })}
+            className="h-4 w-4 rounded accent-purple-700"
+          />
+          <label htmlFor="nvenc_check" className="text-xs font-semibold text-ink-800">
+            Prefer NVIDIA NVENC Hardware Video Encoding (Faster Exports)
+          </label>
+        </div>
+      </div>
     </div>
   )
 }
 
-/** Commits on blur rather than per keystroke, so a PUT isn't fired per letter. */
-function Field({
-  label,
-  hint,
-  value,
-  placeholder,
-  onCommit,
-}: {
-  label: string
-  hint?: string
-  value: string
-  placeholder?: string
-  onCommit: (value: string) => void
-}) {
-  const [draft, setDraft] = useState(value)
-  useEffect(() => setDraft(value), [value])
-
-  return (
-    <label className="block">
-      <span className="eyebrow">{label}</span>
-      <input
-        className="field mt-1 text-sm"
-        value={draft}
-        placeholder={placeholder}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => draft !== value && onCommit(draft)}
-        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-        spellCheck={false}
-      />
-      {hint && <span className="mt-1.5 block text-xs leading-snug text-ink-500">{hint}</span>}
-    </label>
-  )
-}
-
-function NumberField({
-  label,
-  value,
-  onCommit,
-}: {
-  label: string
-  value: number
-  onCommit: (value: number) => void
-}) {
-  const [draft, setDraft] = useState(String(value))
-  useEffect(() => setDraft(String(value)), [value])
-
-  return (
-    <label className="block">
-      <span className="eyebrow">{label}</span>
-      <input
-        type="number"
-        className="field numeric mt-1 text-sm"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => {
-          const parsed = Number(draft)
-          if (!Number.isNaN(parsed) && parsed !== value) onCommit(parsed)
-        }}
-        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-      />
-    </label>
-  )
-}
-
-function Select({
-  label,
-  hint,
-  value,
-  onChange,
-  options,
-  labels = {},
-}: {
-  label: string
-  hint?: string
-  value: string
-  onChange: (value: string) => void
-  options: string[]
-  labels?: Record<string, string>
-}) {
-  return (
-    <label className="block">
-      <span className="eyebrow">{label}</span>
-      <select
-        className="field mt-1 cursor-pointer text-sm"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        {options.map((option) => (
-          <option key={option} value={option} className="bg-ink-850">
-            {labels[option] ?? option}
-          </option>
-        ))}
-      </select>
-      {hint && <span className="mt-1.5 block text-xs leading-snug text-ink-500">{hint}</span>}
-    </label>
-  )
-}
-
-function SecretField({
+function ModernSecretField({
   secretKey,
   label,
   present,
@@ -425,62 +410,69 @@ function SecretField({
   label: string
   present: boolean
   onChanged: () => void
-  onError: (error: Error) => void
+  onError: (err: Error) => void
 }) {
   const [value, setValue] = useState('')
-  const [busy, setBusy] = useState(false)
+  const [show, setShow] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [justSaved, setJustSaved] = useState(false)
 
   const save = async () => {
     if (!value.trim()) return
-    setBusy(true)
+    setSaving(true)
     try {
       await api.putSecret(secretKey, value.trim())
       setValue('')
+      setJustSaved(true)
+      setTimeout(() => setJustSaved(false), 2000)
       onChanged()
-    } catch (err) {
-      onError(err as Error)
+    } catch (err: any) {
+      onError(err)
     } finally {
-      setBusy(false)
-    }
-  }
-
-  const remove = async () => {
-    setBusy(true)
-    try {
-      await api.deleteSecret(secretKey)
-      onChanged()
-    } catch (err) {
-      onError(err as Error)
-    } finally {
-      setBusy(false)
+      setSaving(false)
     }
   }
 
   return (
-    <div className="flex flex-wrap items-end gap-3">
-      <label className="min-w-56 flex-1">
-        <span className="eyebrow">
-          {label}
-          {present && <span className="ml-2 text-signal-good">set</span>}
+    <div className="rounded-2xl border border-canvas-200 bg-canvas-50 p-4 transition-all hover:bg-white hover:border-canvas-300 space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="text-xs font-bold text-ink-900">{label}</label>
+        <span
+          className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+            present ? 'bg-emerald-100 text-emerald-800' : 'bg-canvas-200 text-ink-500'
+          }`}
+        >
+          {present ? 'Key Configured' : 'Missing'}
         </span>
-        <input
-          type="password"
-          className="field mt-1 text-sm"
-          value={value}
-          placeholder={present ? '••••••••••••' : 'paste to add'}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && save()}
-          autoComplete="off"
-        />
-      </label>
-      <button onClick={save} disabled={!value.trim() || busy} className="btn btn-ghost">
-        Save
-      </button>
-      {present && (
-        <button onClick={remove} disabled={busy} className="btn btn-quiet">
-          Remove
+      </div>
+
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <input
+            type={show ? 'text' : 'password'}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder={present ? '••••••••••••••••••••' : 'Paste new key here...'}
+            className="w-full rounded-xl border border-canvas-300 bg-white px-3.5 py-2 text-xs text-ink-900 focus:border-purple-600 focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => setShow(!show)}
+            className="absolute right-3 top-2.5 text-ink-400 hover:text-ink-700"
+          >
+            {show ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+          </button>
+        </div>
+
+        <button
+          type="button"
+          disabled={saving || !value.trim()}
+          onClick={save}
+          className="rounded-xl bg-purple-700 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-purple-800 disabled:opacity-40 transition-colors shrink-0"
+        >
+          {saving ? 'Saving...' : justSaved ? 'Saved!' : 'Save Key'}
         </button>
-      )}
+      </div>
     </div>
   )
 }

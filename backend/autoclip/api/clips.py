@@ -15,6 +15,7 @@ from ..db import store
 from ..db.models import Export, new_id
 from ..pipeline import captions as captions_module
 from ..pipeline import export as export_module
+from ..pipeline.reframe import ReframeConfig, build_crop_path
 from ..pipeline.reframe.croppath import CropPath, centre_crop
 from ..pipeline.runner import JobWorkspace
 from ..pipeline.transcript import Transcript, Word
@@ -25,6 +26,7 @@ from .schemas import (
     ClipPatchIn,
     ExportOut,
     ExportRequestIn,
+    HybridExportIn,
     WordOut,
 )
 
@@ -194,7 +196,9 @@ async def export_clip(clip_id: str, payload: ExportRequestIn) -> ExportOut:
     settings.export.write_srt = payload.write_srt
 
     workspace = JobWorkspace(clip.job_id)
-    crop_path = await asyncio.to_thread(_crop_path_for, workspace, clip, source, payload.ratio)
+    crop_path = await asyncio.to_thread(
+        _crop_path_for, workspace, clip, source, payload.ratio, payload.layout
+    )
 
     destination = (
         paths.exports_dir()
@@ -235,6 +239,81 @@ async def export_clip(clip_id: str, payload: ExportRequestIn) -> ExportOut:
     await asyncio.to_thread(store.update_clip, clip_id, status="exported")
 
     return ExportOut.of(record)
+
+
+@router.post("/clips/{clip_id}/polish")
+async def polish_clip_endpoint(
+    clip_id: str,
+    provider: str | None = None,
+    apply: bool = True,
+) -> dict:
+    """Run Tier 2 creative polish on a candidate clip."""
+    from ..pipeline.reviewer import polish_clip
+
+    try:
+        return await polish_clip(clip_id, tier2_provider_name=provider, apply=apply)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Creative polish failed: {exc}") from exc
+
+
+@router.post("/clips/{clip_id}/package")
+async def package_clip_endpoint(clip_id: str, provider: str | None = None) -> dict:
+    """Generate high-CTR title, SEO description, hashtags, and fair-use source credits."""
+    from ..pipeline.packaging import package_clip
+
+    try:
+        return await package_clip(clip_id, provider_name=provider)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Publishing packaging failed: {exc}") from exc
+
+
+@router.post("/clips/{clip_id}/hybrid")
+async def hybrid_clip_endpoint(
+    clip_id: str,
+    payload: HybridExportIn | None = None,
+) -> dict:
+    """Render a Hybrid Short: Hook VO + Raw Clip + optional Outro CTA."""
+    from ..pipeline.hybrid import render_hybrid_clip
+
+    payload = payload or HybridExportIn()
+    try:
+        result = await render_hybrid_clip(
+            clip_id,
+            hook_text=payload.hook_text,
+            outro_text=payload.outro_text,
+            voice=payload.voice,
+            rate=payload.rate,
+            style_key=payload.style,
+            layout=payload.layout,
+            ratio=payload.ratio,
+            hook_mode=payload.hook_mode,
+            hook_broll_start_s=payload.hook_broll_start_s,
+            hook_duck_volume=payload.hook_duck_volume,
+        )
+        return result.to_dict()
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        log.exception("Hybrid render failed for clip %s", clip_id)
+        raise HTTPException(status_code=500, detail=f"Hybrid short render failed: {exc}") from exc
+
+
+@router.get("/exports/{export_id}/stream")
+async def stream_export(export_id: str) -> FileResponse:
+    """Stream an exported MP4 video so the in-browser player can play it with audio/subtitles."""
+    record = await asyncio.to_thread(store.get_export, export_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Export not found.")
+
+    path = Path(record.path)
+    if not path.exists():
+        raise HTTPException(status_code=410, detail="The exported file has been moved or deleted.")
+
+    return FileResponse(path, media_type="video/mp4")
 
 
 @router.get("/exports/{export_id}/download")
@@ -306,21 +385,42 @@ def _load_transcript(job_id: str) -> Transcript:
     return Transcript.load(workspace.transcript)
 
 
-def _crop_path_for(workspace: JobWorkspace, clip, source, ratio: str) -> CropPath:
-    """Reuse the job's cached crop path, falling back to a centre crop.
+def _crop_path_for(
+    workspace: JobWorkspace,
+    clip,
+    source,
+    ratio: str,
+    layout: str = "auto",
+) -> CropPath:
+    """Reuse the job's cached crop path, falling back to dynamic reframe/fit.
 
-    A re-export at a different ratio can't reuse a path computed for the
-    original one, so the geometry is recomputed rather than stretched.
+    A re-export at a different ratio or layout recomputes rather than reusing
+    an invalid path.
     """
     cached = workspace.crop_path(clip.id)
-    if cached.exists() and ratio == "9:16":
+    if (
+        cached.exists()
+        and ratio == "9:16"
+        and layout == "auto"
+        and not getattr(clip, "user_trimmed", False)
+    ):
         return CropPath.load(cached)
 
     aspect = {"9:16": (9, 16), "1:1": (1, 1), "16:9": (16, 9)}[ratio]
-    return centre_crop(
-        source.width or 1920,
-        source.height or 1080,
-        clip.end_s - clip.start_s,
-        aspect_w=aspect[0],
-        aspect_h=aspect[1],
-    )
+    config = ReframeConfig(aspect_w=aspect[0], aspect_h=aspect[1], layout=layout)
+    try:
+        return build_crop_path(
+            Path(source.path),
+            start_s=clip.start_s,
+            end_s=clip.end_s,
+            config=config,
+        )
+    except Exception as exc:
+        log.warning("build_crop_path failed in _crop_path_for (%s); falling back to centre_crop", exc)
+        return centre_crop(
+            source.width or 1920,
+            source.height or 1080,
+            clip.end_s - clip.start_s,
+            aspect_w=aspect[0],
+            aspect_h=aspect[1],
+        )

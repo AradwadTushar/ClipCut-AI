@@ -9,12 +9,12 @@ from .base import DetectionConfig, LLMProvider, ProviderError, ProviderStatus
 
 log = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "gemini-2.0-flash"
+DEFAULT_MODEL = "gemini-3.6-flash"
 
 SUGGESTED_MODELS = [
-    "gemini-2.0-flash",
-    "gemini-2.0-pro",
-    "gemini-1.5-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3-flash-preview",
 ]
 
 
@@ -53,20 +53,60 @@ class GeminiProvider(LLMProvider):
             max_output_tokens=8192,
         )
 
-        try:
-            # The SDK's async surface has moved between releases; running the
-            # sync call in a thread works across all of them and keeps the event
-            # loop free.
-            response = await asyncio.to_thread(
-                client.models.generate_content,
-                model=self.model,
-                contents=user,
-                config=request_config,
-            )
-        except Exception as exc:
-            raise _translate(exc, self.name, self.model) from exc
+        fallback_models = [self.model]
+        for alt in (
+            "gemini-3.5-flash-lite",
+            "gemini-flash-lite-latest",
+            "gemini-3.1-flash-lite",
+            "gemini-3.5-flash",
+            "gemini-3-flash-preview",
+        ):
+            if alt not in fallback_models:
+                fallback_models.append(alt)
 
-        return getattr(response, "text", "") or ""
+        last_exc: Exception | None = None
+        for model_candidate in fallback_models:
+            max_retries = 2
+            backoff = 1.5
+            for attempt in range(1, max_retries + 1):
+                try:
+                    response = await asyncio.to_thread(
+                        client.models.generate_content,
+                        model=model_candidate,
+                        contents=user,
+                        config=request_config,
+                    )
+                    return getattr(response, "text", "") or ""
+                except Exception as exc:
+                    last_exc = exc
+                    msg = str(exc).lower()
+                    if "limit exceeded" in msg or "quota exceeded" in msg or "daily limit" in msg:
+                        log.warning(
+                            "Gemini model '%s' quota exceeded. Switching to fallback model...",
+                            model_candidate,
+                        )
+                        break
+
+                    is_transient = (
+                        "503" in msg
+                        or "unavailable" in msg
+                        or "spikes in demand" in msg
+                        or "high demand" in msg
+                        or "429" in msg
+                    )
+                    if is_transient and attempt < max_retries:
+                        log.warning(
+                            "Gemini model '%s' hit transient demand (%s). Retrying in %.1fs...",
+                            model_candidate,
+                            exc,
+                            backoff,
+                        )
+                        await asyncio.sleep(backoff)
+                        backoff *= 2
+                    else:
+                        break
+
+        raise _translate(last_exc, self.name, self.model) from last_exc
 
     async def health_check(self) -> ProviderStatus:
         if not self.api_key:

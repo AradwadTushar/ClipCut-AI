@@ -19,7 +19,7 @@ from ..system import report
 from . import captions as captions_module
 from . import ffmpeg
 from .captions import CaptionStyle
-from .reframe.croppath import CropPath, segment_crop_filter
+from .reframe.croppath import CropPath, CropSegment, segment_crop_filter
 from .transcript import Word
 
 log = logging.getLogger(__name__)
@@ -89,6 +89,8 @@ def build_video_filtergraph(
     *,
     subtitle_name: str | None,
     fonts_name: str = "fonts",
+    input_label: str = "[0:v]",
+    output_label: str = "[vout]",
 ) -> str:
     """Build the ``-filter_complex`` video chain for one clip."""
     out_w, out_h = ratio_dimensions(request.ratio)
@@ -105,18 +107,36 @@ def build_video_filtergraph(
 
         if len(segments) == 1:
             # No trim needed; the input is already seeked to the clip.
-            source_label = "[0:v]"
+            source_label = input_label
             prefix = ""
         else:
             source_label = f"[s{index}]"
             prefix = (
-                f"[0:v]trim=start={segment.start_s:.4f}:end={segment.end_s:.4f},"
+                f"{input_label}trim=start={segment.start_s:.4f}:end={segment.end_s:.4f},"
                 f"setpts=PTS-STARTPTS{source_label}"
             )
             parts.append(prefix)
 
         if segment.fit:
-            parts.extend(_fit_chain(source_label, index, out_w, out_h))
+            parts.extend(_fit_chain(source_label, index, out_w, out_h, zoom=segment.zoom))
+            continue
+
+        if getattr(segment, "podcast_split", False):
+            parts.extend(
+                _podcast_split_chain(
+                    source_label,
+                    index,
+                    out_w,
+                    out_h,
+                    segment,
+                    request.crop_path.source_width,
+                    request.crop_path.source_height,
+                )
+            )
+            continue
+
+        if getattr(segment, "split", False):
+            parts.extend(_split_chain(source_label, index, out_w, out_h, segment))
             continue
 
         chain = [segment_crop_filter(segment)]
@@ -136,30 +156,126 @@ def build_video_filtergraph(
     if request.burn_captions and subtitle_name is not None:
         # Bare relative names — ffmpeg runs with its cwd set to the render
         # workspace, so there is nothing here that needs escaping.
-        parts.append(f"{current}ass=filename={subtitle_name}:fontsdir={fonts_name}[vout]")
+        parts.append(f"{current}ass=filename={subtitle_name}:fontsdir={fonts_name}{output_label}")
     else:
-        parts.append(f"{current}null[vout]")
+        parts.append(f"{current}null{output_label}")
 
     return ";".join(parts)
 
 
-def _fit_chain(source_label: str, index: int, out_w: int, out_h: int) -> list[str]:
+def _podcast_split_chain(
+    source_label: str,
+    index: int,
+    out_w: int,
+    out_h: int,
+    segment: CropSegment,
+    source_w: int,
+    source_h: int,
+) -> list[str]:
+    """Stack two crops 50/50: Top 50% Speaker 1 + Bottom 50% Speaker 2 with a divider."""
+    pane_h = out_h // 2
+    pane_h = pane_h - (pane_h % 2)
+
+    # In 9:16 target (e.g. 1080x1920), each pane is 1080 x 960 (ratio 9:8).
+    # To crop from source (e.g. 1920x1080) maintaining 9:8:
+    crop_w = int(source_h * out_w / pane_h)
+    crop_w = min(source_w, crop_w - (crop_w % 2))
+    crop_h = source_h
+
+    # Centering positions for Speaker 1 and Speaker 2
+    s1_center = segment.speaker1_x if segment.speaker1_x is not None else (source_w * 0.30)
+    s2_center = segment.speaker2_x if segment.speaker2_x is not None else (source_w * 0.70)
+
+    x1 = int(max(0, min(source_w - crop_w, s1_center - (crop_w / 2))))
+    x2 = int(max(0, min(source_w - crop_w, s2_center - (crop_w / 2))))
+    x1 = x1 - (x1 % 2)
+    x2 = x2 - (x2 % 2)
+
+    top_filter = (
+        f"[podtop{index}]crop={crop_w}:{crop_h}:{x1}:0,"
+        f"scale={out_w}:{pane_h}:flags=lanczos[top{index}]"
+    )
+    bottom_filter = (
+        f"[podbot{index}]crop={crop_w}:{crop_h}:{x2}:0,"
+        f"scale={out_w}:{pane_h}:flags=lanczos[bot{index}]"
+    )
+
+    return [
+        f"{source_label}split=2[podtop{index}][podbot{index}]",
+        top_filter,
+        bottom_filter,
+        (
+            f"[top{index}][bot{index}]vstack=inputs=2,"
+            f"drawbox=y={pane_h-2}:h=4:color=black@0.90:t=fill,"
+            f"setsar=1,format=yuv420p[v{index}]"
+        ),
+    ]
+
+
+def _split_chain(
+    source_label: str,
+    index: int,
+    out_w: int,
+    out_h: int,
+    segment: CropSegment,
+) -> list[str]:
+    """Stack two crops: Top 35% Facecam + Bottom 65% Gameplay/Action with a divider."""
+    top_h = int(out_h * 0.35)
+    top_h = top_h - (top_h % 2)
+    bottom_h = out_h - top_h
+
+    # Top: Focus on upper scene / face
+    top_filter = (
+        f"[splittop{index}]scale={out_w}:{top_h}:force_original_aspect_ratio=increase:"
+        f"flags=lanczos,crop={out_w}:{top_h}[top{index}]"
+    )
+
+    # Bottom: Focus on wide gameplay / action
+    bottom_filter = (
+        f"[splitbot{index}]scale={out_w}:{bottom_h}:force_original_aspect_ratio=increase:"
+        f"flags=lanczos,crop={out_w}:{bottom_h}[bot{index}]"
+    )
+
+    return [
+        f"{source_label}split=2[splittop{index}][splitbot{index}]",
+        top_filter,
+        bottom_filter,
+        (
+            f"[top{index}][bot{index}]vstack=inputs=2,"
+            f"drawbox=y={top_h-2}:h=4:color=black@0.85:t=fill,"
+            f"setsar=1,format=yuv420p[v{index}]"
+        ),
+    ]
+
+
+def _fit_chain(source_label: str, index: int, out_w: int, out_h: int, zoom: float = 0.0) -> list[str]:
     """Fit the whole frame into the output over a blurred copy of itself.
 
-    Used when the subjects are spread wider than any crop can hold. Plain black
-    bars would be honest but look cheap on a phone; a blurred fill is what
-    viewers are used to seeing and keeps the frame full-bleed.
+    Used when the subjects are spread wider than any crop can hold, or for screenshots/slides.
+    If zoom > 0, slightly scales the foreground frame so it fills more vertical canvas.
     """
+    if zoom > 0:
+        scaled_w = int(out_w * (1.0 + zoom))
+        scaled_w = scaled_w - (scaled_w % 2)
+        scaled_h = int(scaled_w * 9 / 16)
+        scaled_h = scaled_h - (scaled_h % 2)
+        fg_filter = (
+            f"[fitfg{index}]scale={scaled_w}:{scaled_h}:flags=lanczos,"
+            f"crop={out_w}:{scaled_h}[fg{index}]"
+        )
+    else:
+        fg_filter = (
+            f"[fitfg{index}]scale={out_w}:{out_h}:force_original_aspect_ratio=decrease:"
+            f"flags=lanczos[fg{index}]"
+        )
+
     return [
         f"{source_label}split=2[fitbg{index}][fitfg{index}]",
         (
             f"[fitbg{index}]scale={out_w}:{out_h}:force_original_aspect_ratio=increase,"
             f"crop={out_w}:{out_h},boxblur=24:2[bg{index}]"
         ),
-        (
-            f"[fitfg{index}]scale={out_w}:{out_h}:force_original_aspect_ratio=decrease:"
-            f"flags=lanczos[fg{index}]"
-        ),
+        fg_filter,
         (f"[bg{index}][fg{index}]overlay=(W-w)/2:(H-h)/2,setsar=1,format=yuv420p[v{index}]"),
     ]
 
@@ -285,6 +401,14 @@ def export_clip(
         *encoder_args(settings),
         "-pix_fmt",
         "yuv420p",
+        "-colorspace",
+        "bt709",
+        "-color_primaries",
+        "bt709",
+        "-color_trc",
+        "bt709",
+        "-color_range",
+        "tv",
         "-c:a",
         "aac",
         "-b:a",

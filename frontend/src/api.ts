@@ -38,6 +38,102 @@ export interface Job {
   source: Source | null
 }
 
+export interface JobExport {
+  id: string
+  clip_id: string
+  job_id: string
+  pipeline_type: 'pipeline_1' | 'pipeline_2' | 'pipeline_3' | string
+  title: string
+  path: string
+  filename: string
+  ratio: string
+  style: string
+  size_bytes: number
+  size_mb: number
+  download_url: string
+  stream_url: string
+  exists: boolean
+  script: any | null
+  created_at: string
+}
+
+export interface JobScript {
+  id: string
+  job_id: string
+  version: number
+  pipeline_type: string
+  angle_title: string
+  title: string
+  hook: string
+  script: {
+    title?: string
+    hook?: string
+    beats?: Array<{
+      narration: string
+      broll_start_s: number
+      broll_end_s: number
+    }>
+  }
+  source_agent: string
+  feedback: string | null
+  created_at: string
+}
+
+export interface YouTubeChannelStatus {
+  connected: boolean
+  channel_id: string | null
+  title: string | null
+  custom_url: string | null
+  profile_name: string
+  subscriber_count: number
+  video_count: number
+  view_count: number
+  message: string
+}
+
+export interface YouTubeAnalytics {
+  channel_id: string
+  channel_title: string
+  period_days: number
+  start_date: string
+  end_date: string
+  daily_trends: Array<[string, number, number, number, number, number, number, number]>
+  column_headers: string[]
+  top_videos: Array<[string, number, number, number, number, number]>
+  fetched_at: string
+}
+
+export interface YouTubeUploadRecord {
+  id: string
+  export_id: string
+  job_id: string
+  video_id: string
+  channel_title: string
+  title: string
+  status: string
+  scheduled_at: string | null
+  published_at: string | null
+  youtube_url: string
+  created_at: string
+}
+
+
+export interface ScheduleRecommendation {
+  recommended_iso: string
+  recommended_local: string
+  slot_name: string
+  day_label: string
+  today_used: number
+  today_cap: number
+  status_message: string
+  upcoming_slots: Array<{
+    date: string
+    label: string
+    slots_used: number
+    slots_cap: number
+  }>
+}
+
 export interface ExportRecord {
   id: string
   clip_id: string
@@ -127,6 +223,41 @@ export interface ProviderStatus {
   models: string[]
   requires_key: boolean
   has_key: boolean
+}
+
+export interface PackageResult {
+  clip_id: string
+  package: {
+    title: string
+    description: string
+    hashtags: string[]
+    pinned_comment: string
+    attribution_credit: string
+  }
+  saved_to: string
+}
+
+export interface PolishResult {
+  clip_id: string
+  original_title: string
+  original_hook: string
+  original_score: number
+  tier2_provider: string
+  applied: boolean
+  new_start_s: number
+  new_end_s: number
+  new_title: string
+  polish: {
+    optimized_title: string
+    curiosity_hook: string
+    shock_hook: string
+    action_hook: string
+    trim_start_s: number
+    trim_end_s: number
+    refined_score: number
+    verdict: string
+    creative_tip: string
+  }
 }
 
 export interface Settings {
@@ -273,11 +404,112 @@ export const api = {
       body: JSON.stringify(patch),
     }),
 
-  exportClip: (clipId: string, ratio: string, style: string, writeSrt = false) =>
+  exportClip: (
+    clipId: string,
+    ratio: string,
+    style: string,
+    writeSrt = false,
+    layout = 'auto',
+  ) =>
     request<ExportRecord>(`/api/clips/${clipId}/export`, {
       method: 'POST',
-      body: JSON.stringify({ ratio, style, write_srt: writeSrt }),
+      body: JSON.stringify({ ratio, style, write_srt: writeSrt, layout }),
     }),
+
+  polishClip: (clipId: string, provider?: string, apply = true) =>
+    request<PolishResult>(
+      `/api/clips/${clipId}/polish?apply=${apply}${provider ? `&provider=${encodeURIComponent(provider)}` : ''}`,
+      { method: 'POST' },
+    ),
+
+  packageClip: (clipId: string, provider?: string) =>
+    request<PackageResult>(
+      `/api/clips/${clipId}/package${provider ? `?provider=${encodeURIComponent(provider)}` : ''}`,
+      { method: 'POST' },
+    ),
+
+  renderHybrid: (
+    clipId: string,
+    payload?: {
+      hook_text?: string
+      outro_text?: string
+      voice?: string
+      rate?: string
+      style?: string
+      layout?: string
+      ratio?: string
+      hook_mode?: 'prepend_broll' | 'overlay'
+      hook_broll_start_s?: number
+      hook_duck_volume?: number
+    },
+  ) =>
+    request<{
+      export_id: string
+      clip_id: string
+      path: string
+      filename: string
+      hook_text: string
+      outro_text?: string
+      voice: string
+      duration_s: number
+      size_bytes: number
+      download_url: string
+    }>(`/api/clips/${clipId}/hybrid`, {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    }),
+
+  summarizeJob: (
+    jobId: string,
+    payload?: {
+      instructions?: string
+      voice?: string
+      rate?: string
+      caption_style?: string
+      ambient_volume?: number
+      ratio?: string
+      target_duration?: number
+      provider?: string
+      custom_script?: any
+    },
+  ) =>
+    request<{
+      export_id: string
+      clip_id: string
+      job_id: string
+      title: string
+      hook: string
+      script: string
+      beats_count: number
+      path: string
+      filename: string
+      voice: string
+      duration_s: number
+      size_bytes: number
+      download_url: string
+    }>(`/api/jobs/${jobId}/summarize`, {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    }),
+
+  getJobTranscript: (jobId: string) =>
+    request<{
+      job_id: string
+      source_title: string
+      source_duration_s: number
+      word_count: number
+      text: string
+      formatted_text: string
+      claude_prompt: string
+    }>(`/api/jobs/${jobId}/transcript`),
+
+  transcriptDownloadUrl: (jobId: string, format: 'txt' | 'json' = 'txt') =>
+    `/api/jobs/${jobId}/transcript/download?format=${format}`,
+
+  listVoices: () =>
+    request<Array<{ preset: string; voice_id: string; gender: string; style: string }>>(
+      '/api/tts/voices',
+    ),
 
   captionStyles: () => request<CaptionStyle[]>('/api/caption-styles'),
   providerStatus: () => request<ProviderStatus[]>('/api/providers/status'),
@@ -296,6 +528,60 @@ export const api = {
     request<void>(`/api/settings/secrets/${key}`, { method: 'DELETE' }),
 
   mediaUrl: (jobId: string) => `/api/jobs/${jobId}/media`,
+
+  listJobExports: (jobId: string) => request<JobExport[]>(`/api/jobs/${jobId}/exports`),
+
+  listJobScripts: (jobId: string) => request<JobScript[]>(`/api/jobs/${jobId}/scripts`),
+
+  generateJobScripts: (
+    jobId: string,
+    instructions?: string,
+    target_duration?: number,
+    count?: number,
+  ) =>
+    request<any[]>(`/api/jobs/${jobId}/scripts/generate`, {
+      method: 'POST',
+      body: JSON.stringify({ instructions, target_duration, count }),
+    }),
+
+  iterateJobScript: (
+    jobId: string,
+    payload: { previous_script_id?: string; feedback: string; target_duration?: number },
+  ) =>
+    request<any>(`/api/jobs/${jobId}/scripts/iterate`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  getScheduleRecommendation: (timezoneOffsetMinutes?: number, dailyCap?: number, profile?: string) =>
+    request<ScheduleRecommendation>(
+      `/api/youtube/schedule/recommendation?timezone_offset_minutes=${timezoneOffsetMinutes ?? new Date().getTimezoneOffset()}&daily_cap=${dailyCap ?? 3}&profile=${profile || 'default'}`,
+    ),
+
+  getYouTubeStatus: (profile?: string) =>
+    request<YouTubeChannelStatus>(`/api/youtube/status${profile ? `?profile=${profile}` : ''}`),
+
+  getYouTubeAnalytics: (profile?: string, days?: number) =>
+    request<YouTubeAnalytics>(
+      `/api/youtube/analytics?profile=${profile || 'default'}&days=${days || 30}`,
+    ),
+
+  uploadYouTubeShort: (data: {
+    export_id: string
+    title: string
+    description: string
+    tags?: string[]
+    privacy?: string
+    schedule_time_iso?: string
+    profile_name?: string
+  }) =>
+    request<any>('/api/youtube/upload', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  listYouTubeUploadsForJob: (jobId: string) =>
+    request<YouTubeUploadRecord[]>(`/api/youtube/uploads/${jobId}`),
 }
 
 /** Format seconds as m:ss, or h:mm:ss past an hour. */

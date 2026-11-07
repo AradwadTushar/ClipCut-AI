@@ -71,7 +71,7 @@ class TestHealthAndSystem:
 
 
 class TestCaptionStyles:
-    def test_lists_all_four(self, client: TestClient) -> None:
+    def test_lists_all_styles(self, client: TestClient) -> None:
         styles = client.get("/api/caption-styles").json()
 
         assert {s["key"] for s in styles} == {
@@ -79,6 +79,8 @@ class TestCaptionStyles:
             "karaoke_fill",
             "clean_lower",
             "boxed",
+            "hormozi",
+            "neon_gold",
         }
 
     def test_includes_preview_metadata(self, client: TestClient) -> None:
@@ -422,3 +424,31 @@ class TestSecretsNeverLeak:
 
         assert "DEADBEEF" not in paths.config_path().read_text(encoding="utf-8")
         assert config.get_secret("anthropic") == "sk-DEADBEEF"
+
+
+class TestTTSApi:
+    def test_lists_voices(self, client: TestClient) -> None:
+        res = client.get("/api/tts/voices")
+        assert res.status_code == 200
+        voices = res.json()
+        assert len(voices) >= 5
+        presets = {v["preset"] for v in voices}
+        assert "narrator" in presets
+        assert "energetic" in presets
+
+
+class TestStudioPipelines:
+    def test_hybrid_missing_clip_is_404(self, client: TestClient) -> None:
+        res = client.post("/api/clips/nonexistent_clip_id/hybrid", json={})
+        assert res.status_code == 404
+
+    def test_summarize_missing_job_is_404(self, client: TestClient) -> None:
+        res = client.post("/api/jobs/nonexistent_job_id/summarize", json={})
+        assert res.status_code == 404
+
+    def test_hybrid_invalid_volume_rejected(self, client: TestClient) -> None:
+        res = client.post(
+            "/api/clips/any_id/hybrid",
+            json={"hook_duck_volume": 2.5},  # Valid range is 0.0 to 1.0
+        )
+        assert res.status_code == 422

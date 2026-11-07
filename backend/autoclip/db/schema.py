@@ -104,9 +104,78 @@ def _migration_v1(conn: sqlite3.Connection) -> None:
     conn.executescript(_V1)
 
 
+_V2 = """
+-- 1. Extend exports with job_id, pipeline_type, title, script_json
+ALTER TABLE exports ADD COLUMN job_id TEXT REFERENCES jobs(id) ON DELETE CASCADE;
+ALTER TABLE exports ADD COLUMN pipeline_type TEXT NOT NULL DEFAULT 'pipeline_1';
+ALTER TABLE exports ADD COLUMN title TEXT NOT NULL DEFAULT '';
+ALTER TABLE exports ADD COLUMN script_json TEXT;
+CREATE INDEX IF NOT EXISTS idx_exports_job ON exports(job_id);
+
+-- Backfill job_id in exports from clips
+UPDATE exports SET job_id = (SELECT job_id FROM clips WHERE clips.id = exports.clip_id) WHERE job_id IS NULL;
+
+-- 2. Create job_scripts table for multi-angle drafts & iteration history
+CREATE TABLE IF NOT EXISTS job_scripts (
+    id            TEXT PRIMARY KEY,
+    job_id        TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    version       INTEGER NOT NULL DEFAULT 1,
+    pipeline_type TEXT NOT NULL DEFAULT 'pipeline_2',
+    angle_title   TEXT NOT NULL DEFAULT '',
+    title         TEXT NOT NULL DEFAULT '',
+    hook          TEXT NOT NULL DEFAULT '',
+    script_json   TEXT NOT NULL DEFAULT '{}',
+    source_agent  TEXT NOT NULL DEFAULT 'gemini',
+    feedback      TEXT NOT NULL DEFAULT '',
+    created_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_job_scripts_job ON job_scripts(job_id, pipeline_type);
+
+-- 3. Create YouTube Channel Profiles & Upload tracking tables
+CREATE TABLE IF NOT EXISTS youtube_channels (
+    id               TEXT PRIMARY KEY,
+    title            TEXT NOT NULL,
+    custom_url       TEXT NOT NULL DEFAULT '',
+    profile_name     TEXT NOT NULL DEFAULT 'default',
+    credentials_json TEXT NOT NULL DEFAULT '',
+    is_default       INTEGER NOT NULL DEFAULT 1,
+    updated_at       TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS youtube_uploads (
+    id            TEXT PRIMARY KEY,
+    export_id     TEXT NOT NULL REFERENCES exports(id) ON DELETE CASCADE,
+    job_id        TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    video_id      TEXT NOT NULL,
+    channel_id    TEXT NOT NULL,
+    channel_title TEXT NOT NULL DEFAULT '',
+    title         TEXT NOT NULL,
+    status        TEXT NOT NULL,
+    scheduled_at  TEXT,
+    published_at  TEXT,
+    created_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_youtube_uploads_job ON youtube_uploads(job_id);
+
+CREATE TABLE IF NOT EXISTS youtube_analytics_snapshots (
+    id          TEXT PRIMARY KEY,
+    channel_id  TEXT NOT NULL,
+    period_days INTEGER NOT NULL DEFAULT 30,
+    data_json   TEXT NOT NULL,
+    fetched_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_youtube_analytics_channel ON youtube_analytics_snapshots(channel_id);
+"""
+
+
+def _migration_v2(conn: sqlite3.Connection) -> None:
+    conn.executescript(_V2)
+
+
+
 #: Ordered migrations. Index + 1 is the resulting ``user_version``.
 #: Append only — never edit a migration that has shipped.
-MIGRATIONS: list[Callable[[sqlite3.Connection], None]] = [_migration_v1]
+MIGRATIONS: list[Callable[[sqlite3.Connection], None]] = [_migration_v1, _migration_v2]
 
 SCHEMA_VERSION = len(MIGRATIONS)
 

@@ -1,224 +1,266 @@
-# AutoClip
+# 🎬 ClipCut AI Studio
 
-**Open-source, local-first AI video clipper.** Long video in → ranked, caption-burned, speaker-tracked 9:16 clips out.
+<div align="center">
 
-[![CI](https://github.com/artbyjazi/autoclip/actions/workflows/ci.yml/badge.svg)](https://github.com/artbyjazi/autoclip/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Python 3.11 | 3.12](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg)](https://www.python.org/)
+**Autonomous Multi-Pipeline AI Video Engine for High-Retention YouTube Shorts & Reels.**
 
-Paste a YouTube link or drop a file. AutoClip transcribes it, uses an LLM to find the moments worth clipping, reframes them to vertical while tracking whoever is speaking, burns in animated captions, and exports platform-ready MP4s.
+Transform long-form YouTube videos and podcasts into captivating 9:16 vertical content. Choose between automated AI generation or deep human-in-the-loop directing via Claude Desktop MCP.
 
-No accounts. No uploads to anyone's servers. No watermarks. No subscription.
+[![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/)
+[![CUDA 12](https://img.shields.io/badge/NVIDIA-CUDA%2012%20GPU-green.svg)](https://developer.nvidia.com/cuda-toolkit)
+[![React 19](https://img.shields.io/badge/React-19-cyan.svg)](https://react.dev/)
+[![Tailwind CSS 4](https://img.shields.io/badge/Tailwind-CSS%204-indigo.svg)](https://tailwindcss.com/)
+[![MCP Protocol](https://img.shields.io/badge/MCP-Claude%20Desktop%20Stdio-orange.svg)](https://modelcontextprotocol.io/)
+
+[Key Features](#-key-features) •
+[Architecture](#-system-architecture) •
+[The 3 Pipelines](#-the-3-video-generation-pipelines) •
+[Claude Desktop MCP](#-directing-via-claude-desktop-mcp) •
+[Smart Posting Cadence](#-smart-posting-cadence--retention-scheduler) •
+[Quickstart](#-quickstart--installation) •
+[License](#-credits--license)
+
+</div>
 
 ---
 
-## Why this exists
+## 🌟 Key Features
 
-Existing open-source clippers stop at "works on my machine" — no UI, janky reframing, ugly captions. AutoClip ships the whole loop: ingest → clips → review → export.
+- ⚡ **3 Dedicated Production Pipelines:** Choose from Highlight Extraction (P1), 60–90s+ Multi-Angle Story Recap with 100% clean studio audio (P2), or Viral Hybrid Teaser Hook Injection (P3).
+- 🤖 **Dual-Director Architecture:** Generate autonomously via Google Gemini Flash or step into Director Mode via Claude Desktop through the local Model Context Protocol (MCP) server.
+- 🎨 **Modern Hormozi & Neon Captions:** Word-by-word animated ASS subtitles (`Hormozi Punch`, `Neon Gold`, `Bold Pop`, `Karaoke Fill`) with precise sub-millisecond timestamps.
+- 🎙️ **Neural Voice Engine:** Integrated Edge Neural TTS with sub-millisecond word boundaries and diverse expressive voice personas (`Energetic`, `Narrator`, `Storyteller`).
+- 🎯 **Dynamic Scene-Aware Reframing:** Active speaker tracking (MediaPipe FaceMesh), Split-Screen Gamer layout (35% Facecam + 65% Gameplay), and 1.35x Zoom-Fit.
+- 📅 **Algorithmic Posting Cadence:** Calculates high-retention audience windows (Midday Lunch 12:00 PM, Commute 5:30 PM, Night Prime 8:30 PM) with a strict 3 Shorts/day cap to protect channel authority.
+- 🛡️ **Human-in-the-Loop Safe YouTube Publishing:** Mandatory user consent gate, automatic original creator fair-use attribution, and chunked resumable video uploads.
+- 💻 **100% Local Hardware Acceleration:** Faster-Whisper, PyTorch, cuBLAS 12, cuDNN 12, and NVENC/libx264 hardware encoding.
 
-Two ways to run it:
+---
 
-- **Fully local** — Whisper + Ollama. Nothing leaves your machine, no API costs.
-- **Bring your own key** — Anthropic, OpenAI, Gemini, or any OpenAI-compatible endpoint (OpenRouter, Groq, DeepSeek, LM Studio) for better clip selection.
+## 🏗️ System Architecture
 
-Only transcript *text* is ever sent to a provider — never video or audio. With Ollama, nothing is sent at all.
+ClipCut AI is engineered with a modular backend powered by FastAPI and SQLite, coupled with a high-performance React 19 SPA and a local MCP stdio server.
 
-## Status
+```mermaid
+flowchart TD
+    subgraph Ingestion ["1. INGESTION & SPEECH ENGINE"]
+        YT["YouTube URL / Local Video"] --> Ingest["yt-dlp Accelerated Ingest\n(10MB Chunks • 5 Threads)"]
+        Ingest --> FFExtract["FFmpeg Audio Extract (16kHz WAV)"]
+        FFExtract --> Whisper["faster-whisper Small\n(CUDA 12 • FP16 GPU Turbo)"]
+        Whisper --> Transcript["Timestamped Word-Level Dialogue\n(JSON + SQLite Store)"]
+    end
 
-Working end to end: ingest, transcription, highlight detection across four providers, speaker-tracked reframing, four caption styles, export at three aspect ratios, and the full review UI. Verified on real footage — see [what "verified" means](#what-has-and-hasnt-been-verified).
+    subgraph Intelligence ["2. INTELLIGENCE & DIRECTING FORK"]
+        Transcript --> Fork{"Director Fork"}
+        Fork -->|Automated Track| Gemini["Gemini 2.0 / 3.6 Flash\n(Viral Hook Scoring)"]
+        Fork -->|Interactive Track| ClaudeMCP["Claude Desktop\n(Local Stdio MCP Transport)"]
+    end
 
-Pre-1.0. The reframe quality bar hasn't been validated against a fixed golden set yet, which is the gate for tagging v0.1.0.
+    subgraph Pipelines ["3. THREE VIDEO PRODUCTION PIPELINES"]
+        Gemini & ClaudeMCP --> P1["Pipeline 1: Highlight Extractor\n• 15-60s Action Moment\n• Active Speaker Reframing\n• Word-Snapping Trim"]
+        Gemini & ClaudeMCP --> P2["Pipeline 2: Story Recap (60-90s+)\n• Multi-Angle Script Studio\n• Edge Neural Voiceover\n• ambient_volume = 0.0 (Zero Bleed)\n• Auto-Cut Visual B-Roll"]
+        Gemini & ClaudeMCP --> P3["Pipeline 3: Hybrid Hook Machine\n• 4-8s Prepend Teaser Hook\n• Neural Hook Audio\n• 100% Uncut Raw Audio Action"]
+    end
 
-## Requirements
+    subgraph Assembly ["4. COMPOSITING & LIBASS BURN-IN"]
+        P1 & P2 & P3 --> Engine["FFmpeg Video Processing Engine\n• 1080x1920 (9:16) Reframe\n• ASS Dynamic Animated Captions\n• BT.709 Color Profile Correction"]
+        Engine --> Export["Platform-Ready MP4"]
+    end
 
-| | |
-|---|---|
-| **Python** | 3.11 or 3.12 — **not 3.13.** MediaPipe publishes no 3.13 wheels and the reframe stage needs it. |
-| **ffmpeg** | A *full* build with `libass` and `libx264`. Both `ffmpeg` and `ffprobe` on PATH. See below — the default package is the wrong one on macOS and Windows. |
-| **Node** | 20+, to build the UI. Not needed at runtime. |
-| **GPU** | Optional. NVIDIA or Apple Silicon speeds up transcription several-fold; CPU works, just slower. |
-
-`autoclip doctor` checks all of this and tells you exactly what to fix. Run it before anything else.
-
-### Installing ffmpeg correctly
-
-Captions are burned in with **libass**, and on two platforms the obvious package doesn't include it. It installs cleanly, then fails to burn a single caption.
-
-**macOS** — Homebrew split the formula; the plain one is a reduced build:
-
-```bash
-brew install ffmpeg-full
+    subgraph Publishing ["5. SAFE PUBLISHING & CADENCE"]
+        Export --> Cadence["Algorithmic Cadence Scheduler\n(3 Slots/Day • Retention Windows)"]
+        Cadence --> SafeGate{"Interactive Consent Gate\n(Rule 6 Compliance)"}
+        SafeGate -->|User Sign-Off| YTUpload["YouTube Data API v3\n(Chunked Resumable Upload + Creator Credits)"]
+    end
 ```
 
-If you already installed the plain one: `brew unlink ffmpeg && brew link --force --overwrite ffmpeg-full`.
+---
 
-**Windows** — install the *full* build, not `Gyan.FFmpeg.Essentials`:
+## ⚡ The 3 Video Generation Pipelines
 
-```bash
-winget install Gyan.FFmpeg
+### Pipeline 1: Highlight Extraction & Scene-Aware Reframing
+- **Duration:** 15–60 seconds
+- **Audio:** 100% raw source dialogue with word-snapping in/out boundaries.
+- **Framing Modes:**
+  - `Auto (Zoom)`: Dynamic face tracking targeting active speakers.
+  - `Split-Screen (Gamer)`: Top 35% facecam + Bottom 65% gameplay separated by an obsidian border line.
+  - `Zoom-Fit`: 1.35x zoom fill over blurred background for landscape scenery.
+  - `Blur-Fit`: Centered 16:9 canvas over Gaussian-blurred backdrop.
+
+### Pipeline 2: 60–90s+ Multi-Angle Story Recap (Pristine Studio Audio)
+- **Duration:** 60–90+ seconds (7-tier narrative escalation)
+- **Audio:** **100% Clean Studio Narration (`ambient_volume = 0.0`)**. Solves background dialogue bleed by completely isolating the neural voice track over original background visuals.
+- **Creative Angles:** Automatically writes 3 diverse editorial perspectives:
+  1. *Viral Hype & Suspense*
+  2. *Numbers, Financial Stakes & Shock Value*
+  3. *Deep Narrative Story Arc*
+- **Iterative Feedback:** Critique and revise scripts in real-time before burning final render.
+
+### Pipeline 3: The Hybrid Hook Machine (Teaser Hook + Raw Action)
+- **Duration:** 30–65 seconds
+- **Mechanism:** Slices a 2.5–4.5s high-impact visual teaser B-roll from the video, plays an AI-written neural voiceover teaser hook with Hormozi captions over the teaser, and seamlessly transitions to the raw highlight moment with **100% uncut original dialogue intact**.
+
+---
+
+## 🤖 Directing via Claude Desktop (MCP)
+
+ClipCut AI features a local **Model Context Protocol (MCP)** server over standard stdio transport, allowing you to use Claude Desktop as your executive video director.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Creator / Director
+    participant Claude as Claude Desktop App
+    participant MCP as ClipCut MCP Server
+    participant Engine as AutoClip Processing Engine
+
+    User->>Claude: "Direct job f2d0985a27e54694"
+    Claude->>MCP: get_transcript(job_id)
+    MCP-->>Claude: Timestamped dialogue & metadata
+    Claude->>MCP: generate_script_options(job_id, duration=75)
+    MCP-->>Claude: 3 Narrative Angles (Hype, Numbers, Story Arc)
+    Claude->>User: "Here are 3 creative angles. Which do you prefer?"
+    User->>Claude: "Angle 2, but make the intro hook punchier!"
+    Claude->>MCP: create_broll_summary_short(job_id, script, voice="energetic")
+    MCP->>Engine: Synthesize TTS + Slice B-Roll + Burn Captions
+    Engine-->>MCP: Export finished (62.6s • 65.8 MB)
+    MCP-->>Claude: Export ID & Stream URL
+    Claude-->>User: "Short rendered! Ready for review in Web UI."
 ```
 
-**Linux** — the distro package is fine:
+### Claude Desktop Configuration
+Add the following to your `claude_desktop_config.json`:
 
-```bash
-sudo apt install ffmpeg
+```json
+{
+  "mcpServers": {
+    "clipcut": {
+      "command": "c:\\Production Ready Projects\\ClipCut\\autoclip\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "autoclip.mcp.server"]
+    }
+  }
+}
 ```
 
-## Quickstart
+---
 
+## 📅 Smart Posting Cadence & Retention Scheduler
+
+To protect your channel from algorithmic spam penalties caused by erratic bulk uploads (e.g. uploading 50 shorts in an hour), ClipCut AI implements an algorithmic schedule manager:
+
+| Window | Local Time | Target Viewer State |
+| :--- | :--- | :--- |
+| **Slot 1** | **12:00 PM** | **Midday Lunch Peak** — High engagement during lunch and campus breaks. |
+| **Slot 2** | **5:30 PM** | **Evening Commute / Rush** — Peak mobile viewing on transit. |
+| **Slot 3** | **8:30 PM** | **Night Prime Leisure** — Highest daily dwell time and YouTube algorithm activity. |
+
+- **Dynamic Inspection:** Scans SQLite database for existing uploads.
+- **Auto-Advancement:** If today's 3 slots are occupied or passed, automatically reserves tomorrow's earliest prime slot.
+- **1-Click Apply:** Click **"⚡ Apply Optimal Slot"** inside the publish modal to auto-populate the scheduled release time.
+
+---
+
+## 🛡️ Fair-Use Attribution & Safe Publishing
+
+In strict compliance with creator copyright and platform policies:
+- **Mandatory Interactive Consent:** AI never auto-publishes without human sign-off.
+- **Automatic Fair-Use Creator Attribution:** Upload descriptions automatically generate and enforce credits:
+  ```text
+  Highlight from: $1 vs $1,000,000,000 Yacht!
+  ----------------------------------------
+  Credit to Original Creator:
+  🎬 Video: "$1 vs $1,000,000,000 Yacht!"
+  👤 Creator: MrBeast
+  🔗 Watch Original: https://youtube.com/watch?v=...
+  Transformed under Fair Use for educational recap, analysis, and commentary.
+  ----------------------------------------
+  #shorts #viral #recap #highlights
+  ```
+
+---
+
+## 🚀 Quickstart & Installation
+
+### Prerequisites
+1. **Python 3.11** (Required for MediaPipe & PyTorch compatibility).
+2. **FFmpeg with `libass` and `libx264`** (Ensure `ffmpeg` and `ffprobe` are on your PATH).
+3. **Node.js 20+** (For building the React frontend).
+4. **NVIDIA GPU** with CUDA 12 (Optional, but provides 10x faster transcription & rendering).
+
+### 1. Clone & Set Up Python Virtual Environment
 ```bash
-git clone https://github.com/artbyjazi/autoclip.git
+git clone https://github.com/AradwadTushar/ClipCut-AI.git
+cd ClipCut-AI/autoclip
+
+# Create Python 3.11 virtual environment
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+# Install package in editable mode with all dependencies
+pip install -e .
 ```
 
-```bash
-cd autoclip && uv venv --python 3.11 && uv pip install -e ".[dev]"
-```
-
-```bash
-cd frontend && npm install && npm run build && cd ..
-```
-
+### 2. Verify System Dependencies
 ```bash
 autoclip doctor
 ```
 
+### 3. Build Frontend & Launch Studio
 ```bash
+# Build React 19 + Vite frontend
+cd frontend
+npm install
+npm run build
+cd ..
+
+# Start ClipCut Studio Server
 autoclip serve
 ```
+Open **`http://localhost:8000`** in your browser.
 
-That opens `http://localhost:8000`. If you don't use [uv](https://docs.astral.sh/uv/), a plain `python -m venv .venv` and `pip install -e ".[dev]"` works the same way.
+---
 
-### Add a provider
+## 📁 Repository Structure
 
-Clip selection needs a language model. Either paste a key in **Settings → Keys**, or:
-
-```bash
-autoclip config set-secret anthropic
+```text
+ClipCut-AI/
+├── autoclip/
+│   ├── backend/autoclip/
+│   │   ├── api/             # FastAPI REST endpoints (jobs, clips, tts, youtube)
+│   │   ├── db/              # SQLite schema, migrations (v1 -> v2), and CRUD store
+│   │   ├── mcp/             # Local Stdio Model Context Protocol (MCP) server
+│   │   ├── pipeline/
+│   │   │   ├── captions.py  # Hormozi & Neon animated ASS subtitle generator
+│   │   │   ├── export.py    # FFmpeg compositing, cropping, and color correction
+│   │   │   ├── hybrid.py    # Pipeline 3: Hybrid Teaser Hook Injector
+│   │   │   ├── ingest.py    # Multi-threaded yt-dlp downloader
+│   │   │   ├── packaging.py # Viral title, hashtag, and fair-use SEO packager
+│   │   │   ├── reframe/     # MediaPipe FaceMesh active speaker tracking & zoom-fit
+│   │   │   ├── scheduler.py # Smart YouTube posting cadence engine
+│   │   │   ├── summarizer.py# Pipeline 2: 60-90s+ Multi-Angle Story Recap
+│   │   │   ├── transcribe.py# Faster-Whisper GPU-accelerated STT
+│   │   │   ├── tts.py       # Edge Neural Voiceover synthesizer
+│   │   │   └── youtube.py   # Resumable chunked uploader & OAuth manager
+│   │   └── providers/       # Gemini 2.0/3.6, Claude, and OpenAI drivers
+│   ├── frontend/
+│   │   ├── src/
+│   │   │   ├── components/  # SimpleVideoPlayer, ClipCutLogo, YouTubeUploadModal, TrimBar
+│   │   │   ├── pages/       # Landing, Create, JobProgress, Review, Analytics, Settings, History
+│   │   │   ├── api.ts       # Typed REST client
+│   │   │   └── index.css    # Snow White & Royal Purple light theme palette
+│   │   ├── package.json
+│   │   └── vite.config.ts
+│   ├── tests/               # Pytest test suite (scheduler, boundaries, tts, captions)
+│   ├── pyproject.toml
+│   └── LICENSE              # MIT License
+└── README.md
 ```
 
-Keys go into your OS keyring — Credential Manager, Keychain, or Secret Service — never into a config file. If no keyring backend exists, AutoClip falls back to a file **and says so**, in the UI and in `doctor`.
+---
 
-For a fully local setup, install [Ollama](https://ollama.com) and pull a model instead:
+## 📜 Credits & License
 
-```bash
-ollama pull llama3.1:8b
-```
-
-Clip quality tracks model quality closely. A 7B model returns valid JSON full of mediocre picks; a frontier model is noticeably better at spotting a real hook. That's the honest trade for running offline.
-
-### Optional extras
-
-```bash
-uv pip install -e ".[gpu]"
-```
-
-CUDA runtime libraries for NVIDIA GPUs. Install these if `doctor` reports that CTranslate2 can't see your GPU — pip puts them somewhere the OS loader doesn't search, and AutoClip registers the location itself. On macOS this deliberately installs nothing: there's no CUDA there, and Apple Silicon takes the CPU path.
-
-```bash
-uv pip install -e ".[diarization]"
-```
-
-Speaker diarization via WhisperX — what lets the reframe stage cut to whoever is talking in a multi-person video. Pulls PyTorch (large), and needs a HuggingFace token plus acceptance of the gated pyannote model licences.
-
-### Docker
-
-The guaranteed path — ffmpeg, Python version, and fonts all pinned:
-
-```bash
-docker compose -f docker/compose.yaml up --build
-```
-
-```bash
-docker compose -f docker/compose.yaml --profile gpu up --build
-```
-
-## Using it
-
-Everything the UI does is also on the CLI:
-
-| command | does |
-|---|---|
-| `autoclip doctor` | check this machine and explain what's missing |
-| `autoclip serve` | start the web app |
-| `autoclip clip <url\|file>` | run the whole pipeline and export |
-| `autoclip jobs` | list recent jobs |
-| `autoclip providers` | check which providers are reachable |
-| `autoclip styles` | list caption presets |
-| `autoclip config show` | print settings |
-| `autoclip update-ytdlp` | update yt-dlp after a YouTube change |
-
-### Caption styles
-
-| style | look |
-|---|---|
-| `bold_pop` | chunky white, heavy outline, spoken word grows and turns yellow |
-| `karaoke_fill` | words fill with colour exactly as they're spoken |
-| `clean_lower` | minimal lower third, no animation |
-| `boxed` | high-contrast text on a solid block |
-
-Fonts are bundled under the SIL Open Font License, so nothing is fetched at runtime.
-
-## Troubleshooting
-
-Everything here is a real failure hit during development, not hypothetical.
-
-**`autoclip doctor` says Python is wrong.** You're on 3.13. MediaPipe has no wheels for it. `uv venv --python 3.11`.
-
-**Transcription fails with "Library cublas64_12.dll is not found".** The CUDA runtime libraries aren't installed. `uv pip install -e ".[gpu]"`. AutoClip registers their location itself — pip installs them somewhere the OS loader doesn't search, which is why the error is so unhelpful.
-
-**"Requested int8_float16 compute type, but the target device does not support..."** Clear `whisper.compute_type` in `~/.autoclip/config.json` and let AutoClip choose. It queries the backend for what's actually supported rather than guessing from your GPU model.
-
-**Captions don't appear in exports, or ffmpeg says "No such filter: ass".** Your ffmpeg has no libass. `doctor` reports this and prints the right command for your platform. On macOS that means `brew install ffmpeg-full`, not `brew install ffmpeg`; on Windows the full Gyan build, not "essentials".
-
-**YouTube downloads fail with a bot check.** As of 2026, YouTube blocks most anonymous downloads and proof-of-origin tokens no longer clear it. Set **Settings → Ingest → cookies from browser** to a browser you're signed into, and **close that browser** first — it locks its cookie database while running. Uploading a file always works and needs none of this.
-
-**Exports are slower than expected.** Check `doctor` for GPU encoding. A build can list `h264_nvenc` and still be unusable if your driver is older than the NVENC API it was compiled against; AutoClip probes this and falls back to CPU encoding, which is identical quality and just slower.
-
-**No sound in the review player.** Click **Test audio** under the player. It measures the actual signal leaving the video element and tells you whether the problem is in AutoClip or between your browser and your speakers.
-
-## How it works
-
-```
-ingest → prepare → transcribe → highlights → reframe → captions → export
-```
-
-Each stage writes artifacts to `~/.autoclip/work/{job_id}/`, so a retry resumes at the stage that failed rather than starting over. Two decisions carry most of the design:
-
-**Highlight detection returns word indices, not timestamps.** Models are unreliable at arithmetic and completely reliable at copying a number they can see. Timing is looked up from measured word timings afterwards.
-
-**Crop paths never interpolate across a cut.** Shots are detected first and framed independently. Panning through an edit is the most obvious sign of an auto-reframed video.
-
-[ARCHITECTURE.md](docs/ARCHITECTURE.md) covers the rest, including why several odd-looking choices exist.
-
-## What has and hasn't been verified
-
-**Has been:** the full pipeline on real talking-head footage, asserted end to end — 1080×1920 h264/yuv420p output, AAC at −14 LUFS, crop segments tiling each clip without gaps, captions burned in, framing correctly following a cut to a second speaker. Run it yourself:
-
-```bash
-AUTOCLIP_E2E_MEDIA=/path/to/clip.mp4 pytest -m e2e
-```
-
-**Hasn't been:** the §6.4 reframe acceptance bar — no visible jitter, no cut-off faces, speaker on screen ≥95% of speaking time — against a fixed three-video golden set. The mechanics have unit coverage, but "looks right on footage I picked" isn't the bar. This is the gate for v0.1.0.
-
-Also unverified: whether the clip *picks* are good. That's a judgement call about your material and your model, and no test settles it.
-
-## Non-goals
-
-Deliberate, not oversights:
-
-- **No direct posting** to TikTok/Instagram/YouTube. Their APIs are approval-gated; AutoClip exports files.
-- **No cloud version, no accounts, no telemetry.**
-- **No timeline editor** beyond trim handles and caption edits.
-- **No DRM circumvention**, ever.
-
-## Contributing
-
-Prompts and caption styles are the highest-leverage places to start, and neither needs deep knowledge of the codebase — `backend/autoclip/prompts/highlight_v1.txt` is plain text and affects output quality more than most code changes. See [CONTRIBUTING.md](docs/CONTRIBUTING.md).
-
-## Legal
-
-AutoClip bundles [yt-dlp](https://github.com/yt-dlp/yt-dlp). **Only download content you own or have the rights to process.** AutoClip contains no workarounds for DRM or paywalled content and never will.
-
-## License
-
-MIT — see [LICENSE](LICENSE). Bundled fonts (Anton, Inter) are under the SIL Open Font License.
+- **Core Engine:** Built upon and adapted from the open-source [AutoClip](https://github.com/artbyjazi/autoclip) project by **Jad Ghazi**.
+- **Extensions & Enhancements:** Multi-pipeline architecture (Story Recap, Hybrid Hook), Neural Voice Engine, Claude Desktop MCP, YouTube Smart Scheduler, and ClipCut Studio UI created by **Tushar Aradwad**.
+- **License:** Distributed under the **[MIT License](LICENSE)**.

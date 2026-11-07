@@ -45,6 +45,9 @@ class Strategy(StrEnum):
     WIDE = "wide"
     #: No usable face; centre crop, optionally with a slow push-in.
     GENERAL = "general"
+    #: Split-screen: Facecam top 35% + Gameplay bottom 65%.
+    SPLIT = "split"
+    PODCAST_SPLIT = "podcast_split"
 
 
 @dataclass
@@ -72,6 +75,12 @@ class CropSegment:
     #: wider than any crop of the target ratio can hold — cropping there would
     #: cut someone out of frame, which the acceptance bar forbids.
     fit: bool = False
+    #: Split-screen: Facecam top 35% + Gameplay bottom 65%.
+    split: bool = False
+    #: Podcast Split: Speaker 1 top 50% + Speaker 2 bottom 50%.
+    podcast_split: bool = False
+    speaker1_x: float | None = None
+    speaker2_x: float | None = None
 
     @property
     def duration_s(self) -> float:
@@ -123,6 +132,10 @@ class CropPath:
                     strategy=Strategy(raw.get("strategy", "general")),
                     zoom=raw.get("zoom", 0.0),
                     fit=raw.get("fit", False),
+                    split=raw.get("split", False),
+                    podcast_split=raw.get("podcast_split", False),
+                    speaker1_x=raw.get("speaker1_x"),
+                    speaker2_x=raw.get("speaker2_x"),
                 )
             )
         return cls(
@@ -168,6 +181,101 @@ def target_crop_size(
     width = min(source_width, width - (width % 2))
     height = min(source_height, height - (height % 2))
     return max(2, width), max(2, height)
+
+
+def podcast_split_crop(
+    source_width: int,
+    source_height: int,
+    duration_s: float,
+    *,
+    aspect_w: int = 9,
+    aspect_h: int = 16,
+    speaker1_x: float | None = None,
+    speaker2_x: float | None = None,
+) -> CropPath:
+    """Build a dual-speaker podcast split-screen crop path (Speaker 1 top 50% + Speaker 2 bottom 50%)."""
+    width, height = target_crop_size(source_width, source_height, aspect_w, aspect_h)
+    return CropPath(
+        source_width=source_width,
+        source_height=source_height,
+        segments=[
+            CropSegment(
+                start_s=0.0,
+                end_s=duration_s,
+                width=width,
+                height=height,
+                keyframes=[CropKeyframe(t=0.0, x=0.0, y=0.0)],
+                strategy=Strategy.PODCAST_SPLIT,
+                fit=False,
+                split=False,
+                podcast_split=True,
+                speaker1_x=speaker1_x,
+                speaker2_x=speaker2_x,
+            )
+        ],
+    )
+
+
+def split_crop(
+    source_width: int,
+    source_height: int,
+    duration_s: float,
+    *,
+    aspect_w: int = 9,
+    aspect_h: int = 16,
+    keyframes: list[CropKeyframe] | None = None,
+) -> CropPath:
+    """Build a split-screen crop path (Facecam top 35% + Gameplay bottom 65%)."""
+    width, height = target_crop_size(source_width, source_height, aspect_w, aspect_h)
+    return CropPath(
+        source_width=source_width,
+        source_height=source_height,
+        segments=[
+            CropSegment(
+                start_s=0.0,
+                end_s=duration_s,
+                width=width,
+                height=height,
+                keyframes=keyframes or [CropKeyframe(t=0.0, x=0.0, y=0.0)],
+                strategy=Strategy.SPLIT,
+                fit=False,
+                split=True,
+            )
+        ],
+    )
+
+
+def fit_crop(
+    source_width: int,
+    source_height: int,
+    duration_s: float,
+    *,
+    aspect_w: int = 9,
+    aspect_h: int = 16,
+    zoom: float = 0.0,
+) -> CropPath:
+    """Build a static fitted crop path that preserves the whole frame over a blurred background.
+
+    The correct answer whenever a shot contains text-heavy content, screenshots,
+    slides, gaming UI, or when no human face is detected.
+    """
+    width, height = target_crop_size(source_width, source_height, aspect_w, aspect_h)
+    return CropPath(
+        source_width=source_width,
+        source_height=source_height,
+        segments=[
+            CropSegment(
+                start_s=0.0,
+                end_s=duration_s,
+                width=width,
+                height=height,
+                keyframes=[CropKeyframe(t=0.0, x=0.0, y=0.0)],
+                strategy=Strategy.GENERAL,
+                fit=True,
+                zoom=zoom,
+            )
+        ],
+    )
 
 
 def centre_crop(

@@ -126,6 +126,16 @@ def assign_speakers(
         if assignments:
             return assignments
 
+    # Multi-person dynamic tracking:
+    # If the shot is longer than 2.5s and multiple people are present,
+    # evaluate mouth activity in conversational sub-windows (e.g. 1.8-2.5s)
+    # so the framing dynamically cuts/pans to the active speaker rather than
+    # getting stuck in the empty middle space between both people.
+    if len(visible) > 1 and (shot_end_s - shot_start_s) >= 2.5:
+        sub_assignments = _dynamic_sub_assignments(visible, shot_start_s, shot_end_s)
+        if sub_assignments:
+            return sub_assignments
+
     return [_assignment_from_mouth_activity(visible, shot_start_s, shot_end_s)]
 
 
@@ -172,6 +182,50 @@ def _assignments_from_turns(
         )
 
     return [a for a in assignments if a.end_s > a.start_s]
+
+
+def _dynamic_sub_assignments(
+    visible: list[FaceTrack], shot_start_s: float, shot_end_s: float
+) -> list[SpeakerAssignment]:
+    """Slice a long multi-person shot into conversational sub-windows to track active speakers."""
+    window_len = 2.0
+    spans: list[tuple[float, float]] = []
+    t = shot_start_s
+    while t < shot_end_s:
+        next_t = min(t + window_len, shot_end_s)
+        if shot_end_s - next_t < 1.0:
+            next_t = shot_end_s
+        spans.append((t, next_t))
+        t = next_t
+
+    raw_assignments: list[SpeakerAssignment] = []
+    last_track: FaceTrack | None = None
+
+    for span_start, span_end in spans:
+        activity = [(track, track.mouth_activity(span_start, span_end)) for track in visible]
+        activity.sort(key=lambda pair: pair[1], reverse=True)
+
+        best_track, best_score = activity[0]
+        runner_up = activity[1][1] if len(activity) > 1 else 0.0
+
+        chosen_track = None
+        if best_score >= SILENT_MAR_VARIANCE and best_score > runner_up * 1.15:
+            chosen_track = best_track
+        elif last_track is not None and last_track in visible:
+            chosen_track = last_track
+        else:
+            prom = [(track, prominence(track, 1920.0, span_end - span_start)) for track in visible]
+            prom.sort(key=lambda p: p[1], reverse=True)
+            chosen_track = prom[0][0] if prom else None
+
+        last_track = chosen_track
+
+        if raw_assignments and raw_assignments[-1].track is chosen_track:
+            raw_assignments[-1] = SpeakerAssignment(raw_assignments[-1].start_s, span_end, chosen_track)
+        else:
+            raw_assignments.append(SpeakerAssignment(span_start, span_end, chosen_track))
+
+    return raw_assignments
 
 
 def _assignment_from_mouth_activity(
