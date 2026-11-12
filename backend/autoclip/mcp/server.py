@@ -15,7 +15,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from mcp.server.mcpserver import MCPServer
+try:
+    from mcp.server.mcpserver import MCPServer
+except ImportError:  # pragma: no cover
+    MCPServer = None  # type: ignore[assignment,misc]
 
 from .. import db, paths
 from ..config import load as load_settings
@@ -40,6 +43,8 @@ log = logging.getLogger("autoclip.mcp")
 
 def create_mcp_server() -> MCPServer:
     """Construct and configure the AutoClip MCP Server."""
+    if MCPServer is None:
+        raise RuntimeError("mcp Python package is not installed. Please run: pip install mcp")
     paths.ensure_layout()
     db.init()
 

@@ -55,6 +55,10 @@ if [ ! -d ".venv" ]; then
     echo "[+] Dependencies installed successfully!"
 else
     source .venv/bin/activate
+    if ! python -c "import edge_tts, googleapiclient, mcp" &> /dev/null; then
+        echo "[*] Syncing newly added dependencies in virtual environment..."
+        pip install -e .
+    fi
 fi
 
 echo ""

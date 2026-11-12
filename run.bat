@@ -156,6 +156,11 @@ if not exist ".venv\Scripts\activate.bat" (
     echo [+] Dependencies installed successfully!
 ) else (
     call .venv\Scripts\activate.bat
+    python -c "import edge_tts, googleapiclient, mcp" >nul 2>&1
+    if errorlevel 1 (
+        echo [*] Syncing newly added dependencies in virtual environment...
+        pip install -e .
+    )
 )
 
 :: 6. Launch ClipCut Studio Server and open browser

@@ -12,7 +12,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import edge_tts
+try:
+    import edge_tts
+except ImportError:  # pragma: no cover
+    edge_tts = None  # type: ignore[assignment]
 
 from . import ffmpeg
 from .transcript import Word
@@ -82,6 +85,9 @@ async def synthesize_speech(
     clean_text = text.strip()
     if not clean_text:
         raise ValueError("Cannot synthesize empty text.")
+
+    if edge_tts is None:
+        raise RuntimeError("edge-tts is not installed. Please run: pip install edge-tts")
 
     voice_id = resolve_voice(voice)
     output_path.parent.mkdir(parents=True, exist_ok=True)

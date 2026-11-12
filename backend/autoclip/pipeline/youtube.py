@@ -17,11 +17,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
+try:
+    from google.auth.transport.requests import Request
+    from google.oauth2.credentials import Credentials
+    from google_auth_oauthlib.flow import InstalledAppFlow
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaFileUpload
+except ImportError:  # pragma: no cover
+    Request = None  # type: ignore[assignment,misc]
+    Credentials = None  # type: ignore[assignment,misc]
+    InstalledAppFlow = None  # type: ignore[assignment,misc]
+    build = None  # type: ignore[assignment,misc]
+    MediaFileUpload = None  # type: ignore[assignment,misc]
 
 from .. import paths
 from ..db import store
@@ -169,6 +176,13 @@ def start_oauth_flow(
     port: int = 8085,
 ) -> ChannelProfileStatus:
     """Launch local browser OAuth 2.0 flow to connect a YouTube channel."""
+    if InstalledAppFlow is None or build is None:
+        return ChannelProfileStatus(
+            connected=False,
+            profile_name=profile_name,
+            message="Google YouTube API packages are not installed. Please run: pip install google-api-python-client google-auth-oauthlib",
+        )
+
     secrets_path = get_client_secrets_path(client_secrets_path)
     if not secrets_path.exists():
         return ChannelProfileStatus(

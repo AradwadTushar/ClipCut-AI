@@ -50,6 +50,13 @@ dependencies = [
   "numpy>=1.26",
   # Captions
   "pysubs2>=1.7",
+  # Neural Voice & Speech Synthesis
+  "edge-tts>=6.1.0",
+  # YouTube Channel Publishing & Analytics
+  "google-api-python-client>=2.100.0",
+  "google-auth-oauthlib>=1.2.0",
+  # Model Context Protocol (MCP) Server for Claude Desktop
+  "mcp>=1.2.0",
   # Providers
   "anthropic>=0.40",
   "openai>=1.55",
