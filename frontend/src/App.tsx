@@ -1,17 +1,30 @@
 import { ClipCutLogo } from './components/ClipCutLogo'
+import { OnboardingModal } from './components/OnboardingModal'
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, Link } from 'react-router-dom'
-import { Cpu } from 'lucide-react'
+import { Cpu, Sparkles } from 'lucide-react'
 
 import { api, type SystemStatus, type YouTubeChannelStatus } from './api'
 
 export function App() {
   const [system, setSystem] = useState<SystemStatus | null>(null)
   const [ytStatus, setYtStatus] = useState<YouTubeChannelStatus | null>(null)
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
   useEffect(() => {
     api.system().then(setSystem).catch(() => setSystem(null))
     api.getYouTubeStatus('default').then(setYtStatus).catch(() => setYtStatus(null))
+
+    // Auto-open onboarding on first visit if not completed
+    const completed = localStorage.getItem('clipcut_onboarding_completed')
+    if (!completed) {
+      api.providerStatus().then((statuses) => {
+        const gemini = statuses.find((s) => s.name === 'gemini')
+        if (!gemini || !gemini.has_key) {
+          setShowOnboarding(true)
+        }
+      }).catch(() => {})
+    }
   }, [])
 
   return (
@@ -38,7 +51,18 @@ export function App() {
           </div>
 
           {/* Right-Side Telemetry Badges */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            {/* Quick Tour Launcher */}
+            <button
+              type="button"
+              onClick={() => setShowOnboarding(true)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50/70 px-3 py-1 text-xs font-semibold text-purple-800 hover:bg-purple-100 transition-colors"
+              title="Launch feature walkthrough & API setup"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-purple-600" />
+              <span>Quick Tour</span>
+            </button>
+
             {/* YouTube Channel Status Badge */}
             <Link
               to="/analytics"
@@ -70,6 +94,9 @@ export function App() {
       <main className="mx-auto w-full max-w-[1600px] flex-1 px-6 pb-20 lg:px-10">
         <Outlet />
       </main>
+
+      {/* ---------------- Onboarding & Feature Tour Modal ---------------- */}
+      <OnboardingModal isOpen={showOnboarding} onClose={() => setShowOnboarding(false)} />
 
       {/* ---------------- Footer with Core Attribution ---------------- */}
       <footer className="border-t border-canvas-300 bg-white py-8 text-xs text-ink-600">

@@ -18,7 +18,7 @@ Transform long-form YouTube videos and podcasts into captivating 9:16 vertical c
 [The 3 Pipelines](#the-3-video-generation-pipelines) •
 [Claude Desktop MCP](#directing-via-claude-desktop-mcp) •
 [Smart Posting Cadence](#smart-posting-cadence--retention-scheduler) •
-[Quickstart](#quickstart--installation) •
+[Quickstart](#quickstart--installation-under-2-minutes) •
 [License](#credits--license)
 
 </div>
@@ -98,46 +98,47 @@ flowchart TD
 - **Iterative Feedback:** Critique and revise scripts in real-time before burning final render.
 
 ### Pipeline 3: The Hybrid Hook Machine (Teaser Hook + Raw Action)
-- **Duration:** 30–65 seconds
-- **Mechanism:** Slices a 2.5–4.5s high-impact visual teaser B-roll from the video, plays an AI-written neural voiceover teaser hook with Hormozi captions over the teaser, and seamlessly transitions to the raw highlight moment with **100% uncut original dialogue intact**.
+- **Strategy:** Resolves high viewer drop-off in the first 3 seconds of vertical video feeds.
+- **Prepend B-Roll Teaser (`hook_mode="prepend_broll"`):** Slices a 2.5–3.5s dramatic B-roll teaser shot from the video climax, overlays high-energy AI voice hook and kinetic captions, then cuts into the main clip with 100% uncut original dialogue and audio.
 
 ---
 
-## Directing via Claude Desktop (MCP)
+## Directing via Claude Desktop MCP
 
-ClipCut AI features a local **Model Context Protocol (MCP)** server over standard stdio transport, allowing you to use Claude Desktop as your executive video director.
+ClipCut AI exposes its entire video pipeline as a local stdio Model Context Protocol (MCP) server. You can direct, generate, and polish shorts directly inside Claude Desktop.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as Creator / Director
-    participant Claude as Claude Desktop App
-    participant MCP as ClipCut MCP Server
-    participant Engine as AutoClip Processing Engine
+    actor Creator as Creator (Claude Desktop)
+    participant MCP as Local Stdio MCP Server (FastAPI / autoclip)
+    participant Pipeline as ClipCut Video Engine (FFmpeg / Whisper)
+    participant SQLite as Job State & History DB
 
-    User->>Claude: "Direct job f2d0985a27e54694"
-    Claude->>MCP: get_transcript(job_id)
-    MCP-->>Claude: Timestamped dialogue & metadata
-    Claude->>MCP: generate_script_options(job_id, duration=75)
-    MCP-->>Claude: 3 Narrative Angles (Hype, Numbers, Story Arc)
-    Claude->>User: "Here are 3 creative angles. Which do you prefer?"
-    User->>Claude: "Angle 2, but make the intro hook punchier!"
-    Claude->>MCP: create_broll_summary_short(job_id, script, voice="energetic")
-    MCP->>Engine: Synthesize TTS + Slice B-Roll + Burn Captions
-    Engine-->>MCP: Export finished (62.6s • 65.8 MB)
-    MCP-->>Claude: Export ID & Stream URL
-    Claude-->>User: "Short rendered! Ready for review in Web UI."
+    Creator->>MCP: Call analyze_video(url, provider="gemini")
+    MCP->>Pipeline: Ingest YouTube video & extract audio
+    Pipeline->>Pipeline: Run faster-whisper GPU transcription
+    Pipeline->>SQLite: Store word timestamps & job record
+    MCP-->>Creator: Return transcript, metadata, and candidate highlights
+
+    Creator->>MCP: Call polish_clip(clip_id, title, in_s, out_s)
+    MCP->>SQLite: Update clip bounds & viral title
+    MCP-->>Creator: Return polish confirmation
+
+    Creator->>MCP: Call create_broll_summary_short(job_id, script, voice="energetic")
+    MCP->>Pipeline: Slices B-roll footage + Synthesize Edge TTS + Burn Hormozi ASS
+    Pipeline-->>MCP: Export platform-ready MP4 (1080x1920)
+    MCP-->>Creator: Return export path & duration
 ```
 
 ### Claude Desktop Configuration
-Add the following to your `claude_desktop_config.json`:
-
+Add the server block to your `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
     "clipcut": {
-      "command": "c:\\Production Ready Projects\\ClipCut\\autoclip\\.venv\\Scripts\\python.exe",
-      "args": ["-m", "autoclip.mcp.server"]
+      "command": "C:\\Production Ready Projects\\ClipCut\\autoclip\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "autoclip.mcp"]
     }
   }
 }
@@ -147,7 +148,7 @@ Add the following to your `claude_desktop_config.json`:
 
 ## Smart Posting Cadence & Retention Scheduler
 
-To protect your channel from algorithmic spam penalties caused by erratic bulk uploads (e.g. uploading 50 shorts in an hour), ClipCut AI implements an algorithmic schedule manager:
+To protect your channel from algorithmic spam penalties caused by erratic bulk uploads, ClipCut AI implements an algorithmic schedule manager:
 
 | Window | Local Time | Target Viewer State |
 | :--- | :--- | :--- |
@@ -180,44 +181,54 @@ In strict compliance with creator copyright and platform policies:
 
 ---
 
-## Quickstart & Installation
+## Quickstart & Installation (Under 2 Minutes)
 
-### Prerequisites
-1. **Python 3.11** (Required for MediaPipe & PyTorch compatibility).
-2. **FFmpeg with `libass` and `libx264`** (Ensure `ffmpeg` and `ffprobe` are on your PATH).
-3. **Node.js 20+** (For building the React frontend).
-4. **NVIDIA GPU** with CUDA 12 (Optional, but provides 10x faster transcription & rendering).
+ClipCut AI comes with pre-compiled production assets. You do not need Node.js or complex development toolchains to run ClipCut.
 
-### 1. Clone & Set Up Python Virtual Environment
+### Option A: Windows (One-Click Launch)
+1. Download or clone this repository:
+   - Direct ZIP: Download and extract the [Latest Source ZIP](https://github.com/AradwadTushar/ClipCut-AI/archive/refs/heads/main.zip).
+   - Or via Git:
+     ```bash
+     git clone https://github.com/AradwadTushar/ClipCut-AI.git
+     cd ClipCut-AI
+     ```
+2. Double-click `run.bat`.
+   - Automatically detects Python 3.10/3.11 and FFmpeg.
+   - Sets up the isolated environment and dependencies.
+   - Automatically launches ClipCut Studio in your browser at `http://localhost:8000`.
+
+### Option B: macOS / Linux
 ```bash
 git clone https://github.com/AradwadTushar/ClipCut-AI.git
-cd ClipCut-AI/autoclip
-
-# Create Python 3.11 virtual environment
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-
-# Install package in editable mode with all dependencies
-pip install -e .
+cd ClipCut-AI
+chmod +x run.sh && ./run.sh
 ```
 
-### 2. Verify System Dependencies
-```bash
-autoclip doctor
-```
+---
 
-### 3. Build Frontend & Launch Studio
-```bash
-# Build React 19 + Vite frontend
-cd frontend
-npm install
-npm run build
-cd ..
+## First-Run Onboarding Tour & Free AI Key
+When you launch ClipCut Studio for the first time:
+1. An interactive Feature Tour walks you through the 3 video production pipelines, Hormozi captions, active speaker tracking, and smart YouTube scheduling.
+2. The final step connects your free AI brain:
+   - Paste your Google Gemini API Key ([Get your free key at Google AI Studio](https://aistudio.google.com/app/apikey) -- 100% free, no credit card required).
+   - Click "Launch ClipCut Studio" and start generating Shorts immediately.
 
-# Start ClipCut Studio Server
-autoclip serve
-```
-Open **`http://localhost:8000`** in your browser.
+---
+
+## Getting Updates
+When new features or pipeline upgrades are released:
+- Windows: Double-click `update.bat`.
+- macOS / Linux: Run `./update.sh`.
+
+---
+
+## Manual Developer Setup (Optional)
+If you wish to modify the React frontend or extend core pipelines:
+1. Python 3.11 environment: `python -m venv .venv && pip install -e .`
+2. Frontend dev server / build: `cd frontend && npm install && npm run build`
+3. Verify dependencies: `autoclip doctor`
+4. Start server: `autoclip serve`
 
 ---
 
@@ -225,11 +236,16 @@ Open **`http://localhost:8000`** in your browser.
 
 ```text
 ClipCut-AI/
+├── run.bat                  # One-click Windows launcher
+├── update.bat               # One-click Windows updater
+├── run.sh                   # One-click macOS / Linux launcher
+├── update.sh                # One-click macOS / Linux updater
 ├── autoclip/
 │   ├── backend/autoclip/
 │   │   ├── api/             # FastAPI REST endpoints (jobs, clips, tts, youtube)
 │   │   ├── db/              # SQLite schema, migrations (v1 -> v2), and CRUD store
 │   │   ├── mcp/             # Local Stdio Model Context Protocol (MCP) server
+│   │   ├── static/          # Pre-compiled React 19 production bundle (Zero-Node needed)
 │   │   ├── pipeline/
 │   │   │   ├── captions.py  # Hormozi & Neon animated ASS subtitle generator
 │   │   │   ├── export.py    # FFmpeg compositing, cropping, and color correction
@@ -245,22 +261,15 @@ ClipCut-AI/
 │   │   └── providers/       # Gemini 2.0/3.6, Claude, and OpenAI drivers
 │   ├── frontend/
 │   │   ├── src/
-│   │   │   ├── components/  # SimpleVideoPlayer, ClipCutLogo, YouTubeUploadModal, TrimBar
+│   │   │   ├── components/  # OnboardingModal, SimpleVideoPlayer, ClipCutLogo, YouTubeUploadModal
 │   │   │   ├── pages/       # Landing, Create, JobProgress, Review, Analytics, Settings, History
 │   │   │   ├── api.ts       # Typed REST client
-│   │   │   └── index.css    # Snow White & Royal Purple light theme palette
-│   │   ├── package.json
-│   │   └── vite.config.ts
-│   ├── tests/               # Pytest test suite (scheduler, boundaries, tts, captions)
-│   ├── pyproject.toml
-│   └── LICENSE              # MIT License
-└── README.md
 ```
 
 ---
 
 ## Credits & License
 
-- **Core Engine:** Built upon and adapted from the open-source [AutoClip](https://github.com/artbyjazi/autoclip) project by **Jad Ghazi**.
-- **Extensions & Enhancements:** Multi-pipeline architecture (Story Recap, Hybrid Hook), Neural Voice Engine, Claude Desktop MCP, YouTube Smart Scheduler, and ClipCut Studio UI created by **Tushar Aradwad**.
-- **License:** Distributed under the **[MIT License](LICENSE)**.
+Engineered on the foundation of AutoClip Core by artbyjazi, extended into an autonomous 3-Pipeline Creator Studio with Edge Neural TTS, Hormozi animations, MediaPipe speaker tracking, Claude MCP directing, and smart YouTube scheduling by Tushar Aradwad.
+
+Licensed under the MIT License.

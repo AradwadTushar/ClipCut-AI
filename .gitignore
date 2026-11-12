@@ -22,9 +22,8 @@ frontend/.vite/
 *.tsbuildinfo
 *.local
 
-# Built frontend, emitted into the Python package by `npm run build`.
-# Regenerated from source; a release build produces it during packaging.
-backend/autoclip/static/
+# Built frontend bundled for zero-Node.js consumer installs
+# backend/autoclip/static/
 
 # AutoClip runtime artifacts
 .autoclip/
