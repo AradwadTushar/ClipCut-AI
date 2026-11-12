@@ -33,6 +33,26 @@ export function Settings() {
     return Number(localStorage.getItem('clipcut_daily_cap')) || 3
   })
 
+  const [customSlotTimes, setCustomSlotTimes] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('clipcut_custom_slots')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed) && parsed.length >= 5) return parsed
+      }
+    } catch {}
+    return ['12:00', '17:30', '20:30', '09:00', '15:00']
+  })
+
+  const handleUpdateSlotTime = (index: number, newTime: string) => {
+    const updated = [...customSlotTimes]
+    updated[index] = newTime
+    setCustomSlotTimes(updated)
+    localStorage.setItem('clipcut_custom_slots', JSON.stringify(updated))
+    setSavedMessage(`Slot ${index + 1} updated to ${newTime}`)
+    setTimeout(() => setSavedMessage(null), 2000)
+  }
+
   const reload = () => {
     void api.getSettings().then(setSettings).catch((e) => setError(e as Error))
     void api.providerStatus().then(setProviders).catch(() => undefined)
@@ -225,27 +245,61 @@ export function Settings() {
           </div>
         </div>
 
-        {/* High-Retention Windows Overview */}
+        {/* Custom High-Retention Time Slots */}
         <div className="space-y-3 pt-2">
-          <label className="block text-xs font-bold uppercase tracking-wider text-ink-700">
-            Algorithmic High-Traffic Time Slots
-          </label>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-canvas-200 bg-canvas-50 p-3.5 space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700">Slot 1 • Midday</span>
-              <h5 className="font-bold text-xs text-ink-950">12:00 PM (Lunch Break)</h5>
-              <p className="text-[11px] text-ink-500">High engagement from mobile users during midday breaks.</p>
-            </div>
-            <div className="rounded-2xl border border-canvas-200 bg-canvas-50 p-3.5 space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700">Slot 2 • Commute</span>
-              <h5 className="font-bold text-xs text-ink-950">5:30 PM (Evening Rush)</h5>
-              <p className="text-[11px] text-ink-500">Peak scroll volume as viewers commute from work/school.</p>
-            </div>
-            <div className="rounded-2xl border border-canvas-200 bg-canvas-50 p-3.5 space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700">Slot 3 • Prime Time</span>
-              <h5 className="font-bold text-xs text-ink-950">8:30 PM (Night Leisure)</h5>
-              <p className="text-[11px] text-ink-500">Highest average watch duration and completion rate.</p>
-            </div>
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-bold uppercase tracking-wider text-ink-700">
+              Custom Upload Time Slots ({dailyCap} active)
+            </label>
+            <span className="text-[11px] text-ink-500">Local time (HH:MM)</span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: dailyCap }).map((_, idx) => {
+              const defaultSlotsInfo = [
+                { name: 'Midday Lunch', hint: 'High engagement during lunchtime mobile browsing.' },
+                { name: 'Evening Rush', hint: 'Peak scroll volume as viewers commute home.' },
+                { name: 'Night Prime', hint: 'Highest watch completion rates and comment activity.' },
+                { name: 'Morning Scroll', hint: 'Early-bird viewers catching up on new trends.' },
+                { name: 'Afternoon Break', hint: 'Post-lunch leisure browsing window.' },
+              ]
+              const desc = defaultSlotsInfo[idx] || { name: `Slot ${idx + 1}`, hint: 'Custom target time' }
+              const timeVal = customSlotTimes[idx] || '12:00'
+              return (
+                <div key={idx} className="rounded-2xl border border-canvas-200 bg-canvas-50 p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700">
+                      Slot {idx + 1} • {desc.name}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="time"
+                      value={timeVal}
+                      onChange={(e) => handleUpdateSlotTime(idx, e.target.value)}
+                      className="rounded-xl border border-canvas-300 bg-white px-3 py-1.5 text-xs font-mono font-bold text-ink-900 focus:border-purple-600 focus:outline-none"
+                    />
+                    <span className="text-xs text-ink-600 font-medium">
+                      {(() => {
+                        try {
+                          const [hStr, mStr] = timeVal.split(':')
+                          const h = parseInt(hStr, 10)
+                          const m = parseInt(mStr, 10)
+                          const ampm = h >= 12 ? 'PM' : 'AM'
+                          const dispH = h % 12 || 12
+                          return `${dispH}:${m < 10 ? '0' + m : m} ${ampm}`
+                        } catch {
+                          return timeVal
+                        }
+                      })()}
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-ink-500 leading-snug">{desc.hint}</p>
+                </div>
+              )
+            })}
           </div>
         </div>
 

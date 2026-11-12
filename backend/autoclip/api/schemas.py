@@ -286,3 +286,4 @@ class SystemOut(BaseModel):
     gpu_name: str | None
     compute_type: str
     diarization_available: bool
+    claude_mcp_connected: bool = False

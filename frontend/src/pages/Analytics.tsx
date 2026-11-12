@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   BarChart3,
   TrendingUp,
@@ -9,8 +10,32 @@ import {
   RefreshCw,
   AlertCircle,
   CheckCircle2,
+  Lock,
+  Copy,
+  Check,
+  Sliders,
+  HelpCircle,
 } from 'lucide-react'
 import { api, type YouTubeAnalytics, type YouTubeChannelStatus } from '../api'
+
+function YouTubeIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+    </svg>
+  )
+}
+
+const YOUTUBE_OAUTH_LLM_PROMPT = `I am using ClipCut AI (an open-source video clipping tool) and I want to enable YouTube Analytics and Shorts auto-uploading.
+
+Please guide me step-by-step through Google Cloud Console to get my OAuth 2.0 Desktop credentials:
+1. Where to create a new project in Google Cloud Console.
+2. How to enable "YouTube Data API v3" and "YouTube Analytics API".
+3. How to configure the "OAuth consent screen" (User type: External, add my Gmail as a test user, add scopes '.../auth/youtube.upload' and '.../auth/yt-analytics.readonly').
+4. How to create an OAuth client ID (Application type: Desktop app).
+5. How to download the credentials JSON file and rename it to 'client_secrets.json' to place it in my ClipCut directory or upload it in ClipCut Settings.
+
+Please keep instructions simple, numbered, and beginner-friendly!`;
 
 export function Analytics() {
   const [status, setStatus] = useState<YouTubeChannelStatus | null>(null)
@@ -61,6 +86,14 @@ export function Analytics() {
   useEffect(() => {
     loadData(false)
   }, [])
+
+  const [copiedPrompt, setCopiedPrompt] = useState(false)
+
+  const handleCopyPrompt = () => {
+    navigator.clipboard.writeText(YOUTUBE_OAUTH_LLM_PROMPT)
+    setCopiedPrompt(true)
+    setTimeout(() => setCopiedPrompt(false), 2500)
+  }
 
   const handleRefresh = () => {
     setRefreshing(true)
@@ -117,8 +150,77 @@ export function Analytics() {
         </div>
       )}
 
+      {/* Locked State Banner & Setup Dialogue if YouTube is disconnected */}
+      {!loading && !status?.connected && (
+        <div className="rounded-3xl border-2 border-purple-200 bg-white p-6 sm:p-8 shadow-sm space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-100 text-purple-700">
+                <Lock className="h-6 w-6" />
+              </div>
+              <div>
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-purple-700">
+                  <YouTubeIcon className="h-3.5 w-3.5 text-red-600" />
+                  <span>Channel Integration Required</span>
+                </span>
+                <h3 className="text-xl font-extrabold text-ink-950">
+                  YouTube Telemetry & Retention Locked
+                </h3>
+              </div>
+            </div>
+
+            <Link
+              to="/settings"
+              className="inline-flex items-center gap-2 rounded-xl bg-purple-700 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-purple-800 transition-all"
+            >
+              <Sliders className="h-4 w-4" />
+              <span>Connect in Settings</span>
+            </Link>
+          </div>
+
+          <p className="text-xs text-ink-600 max-w-3xl leading-relaxed">
+            Live audience retention curves (APV), subscriber milestones, and video performance graphs require connecting your YouTube account via Google OAuth 2.0 (<code className="font-mono text-purple-700">client_secrets.json</code>).
+          </p>
+
+          {/* Copy-Ready LLM Prompt */}
+          <div className="rounded-2xl border border-purple-200 bg-purple-50/60 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-purple-900">
+                <HelpCircle className="h-4 w-4 text-purple-700" />
+                <span>Copy-Ready Prompt for ChatGPT / Claude / Gemini</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyPrompt}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-purple-700 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-purple-800 transition-colors"
+              >
+                {copiedPrompt ? (
+                  <>
+                    <Check className="h-3.5 w-3.5 text-emerald-300" />
+                    <span>Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5" />
+                    <span>Copy Prompt</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            <p className="text-[11px] text-purple-800">
+              Need help creating your Google Cloud credentials? Copy this prompt and paste it into any AI to get a step-by-step walkthrough:
+            </p>
+
+            <pre className="max-h-32 overflow-y-auto rounded-xl border border-purple-200 bg-white p-3 font-mono text-[11px] text-ink-800 leading-relaxed whitespace-pre-wrap select-all">
+              {YOUTUBE_OAUTH_LLM_PROMPT}
+            </pre>
+          </div>
+        </div>
+      )}
+
       {/* Top Overview Cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className={`grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 ${!status?.connected ? 'opacity-60 pointer-events-none' : ''}`}>
         <div className="glass-card rounded-2xl p-6">
           <div className="flex items-center justify-between text-ink-500">
             <span className="text-xs font-bold uppercase tracking-wider">Channel Profile</span>
@@ -126,15 +228,24 @@ export function Analytics() {
           </div>
           <div className="mt-3">
             <div className="text-xl font-extrabold text-ink-950">
-              {status?.title || 'Oshawa'}
+              {status?.connected ? (status?.title || 'Connected Channel') : 'Not Connected'}
             </div>
             <div className="text-xs text-purple-700 font-medium">
-              {status?.custom_url || '@oshawa-t9e'}
+              {status?.connected ? (status?.custom_url || '@channel') : 'Connect in Settings'}
             </div>
           </div>
-          <div className="mt-4 flex items-center gap-1.5 text-xs text-signal-good font-semibold">
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            <span>OAuth 2.0 Connected</span>
+          <div className="mt-4 flex items-center gap-1.5 text-xs font-semibold">
+            {status?.connected ? (
+              <span className="text-signal-good inline-flex items-center gap-1">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                <span>OAuth 2.0 Connected</span>
+              </span>
+            ) : (
+              <span className="text-amber-700 inline-flex items-center gap-1">
+                <Lock className="h-3.5 w-3.5" />
+                <span>Authentication Required</span>
+              </span>
+            )}
           </div>
         </div>
 
@@ -144,10 +255,14 @@ export function Analytics() {
             <TrendingUp className="h-4 w-4 text-purple-600" />
           </div>
           <div className="mt-3 text-3xl font-extrabold text-ink-950">
-            {(status?.subscriber_count || 0).toLocaleString()}
+            {status?.connected ? (status?.subscriber_count || 0).toLocaleString() : '—'}
           </div>
           <div className="mt-4 text-xs text-ink-600">
-            Channel ID: <span className="font-mono text-[11px]">{status?.channel_id?.slice(0, 10)}...</span>
+            {status?.connected ? (
+              <>Channel ID: <span className="font-mono text-[11px]">{status?.channel_id?.slice(0, 10)}...</span></>
+            ) : (
+              'Connect channel to view'
+            )}
           </div>
         </div>
 
@@ -157,10 +272,10 @@ export function Analytics() {
             <Eye className="h-4 w-4 text-purple-600" />
           </div>
           <div className="mt-3 text-3xl font-extrabold text-ink-950">
-            {(status?.view_count || 0).toLocaleString()}
+            {status?.connected ? (status?.view_count || 0).toLocaleString() : '—'}
           </div>
           <div className="mt-4 text-xs text-ink-600">
-            Across {status?.video_count || 0} published videos
+            {status?.connected ? `Across ${status?.video_count || 0} published videos` : 'Sync live view telemetry'}
           </div>
         </div>
 
@@ -172,7 +287,7 @@ export function Analytics() {
           </div>
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-3xl font-extrabold text-purple-950">
-              {avgRetention > 0 ? `${avgRetention}%` : '80.2%'}
+              {status?.connected && avgRetention > 0 ? `${avgRetention}%` : '80.2%'}
             </span>
             <span className="text-xs font-semibold text-purple-700">Target: &gt;80%</span>
           </div>

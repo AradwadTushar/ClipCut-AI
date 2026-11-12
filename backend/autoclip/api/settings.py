@@ -130,9 +130,33 @@ async def providers_status() -> list[ProviderStatusOut]:
     return list(await asyncio.gather(*(check(name) for name in PROVIDERS)))
 
 
+def _check_claude_mcp_connected() -> bool:
+    import json
+    import os
+    from pathlib import Path
+
+    candidates = [
+        Path(os.path.expandvars(r"%APPDATA%\Claude\claude_desktop_config.json")),
+        Path(os.path.expandvars(r"%LOCALAPPDATA%\Claude-Data\claude_pzs8sxrjxfjjc\claude_desktop_config.json")),
+        Path(os.path.expanduser("~/Library/Application Support/Claude/claude_desktop_config.json")),
+        Path(os.path.expanduser("~/.config/Claude/claude_desktop_config.json")),
+    ]
+    for p in candidates:
+        if p.exists():
+            try:
+                data = json.loads(p.read_text(encoding="utf-8"))
+                servers = data.get("mcpServers", {})
+                if any("autoclip" in k.lower() or "clipcut" in k.lower() for k in servers.keys()):
+                    return True
+            except Exception:
+                pass
+    return False
+
+
 @router.get("/system", response_model=SystemOut)
 async def system_status() -> SystemOut:
     report = await asyncio.to_thread(system.refresh)
+    mcp_active = await asyncio.to_thread(_check_claude_mcp_connected)
     return SystemOut(
         ready=report.ready,
         python_version=report.python_version,
@@ -144,6 +168,7 @@ async def system_status() -> SystemOut:
         gpu_name=report.gpu.name,
         compute_type=report.gpu.compute_type,
         diarization_available=report.deps.whisperx,
+        claude_mcp_connected=mcp_active,
     )
 
 

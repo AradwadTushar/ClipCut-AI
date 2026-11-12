@@ -27,11 +27,13 @@ import {
   type Word,
   type YouTubeChannelStatus,
   type PackageResult,
+  type SystemStatus,
 } from '../api'
 import { CaptionEditor } from '../components/CaptionEditor'
 import { SimpleVideoPlayer } from '../components/SimpleVideoPlayer'
 import { TrimBar } from '../components/TrimBar'
 import { YouTubeUploadModal } from '../components/YouTubeUploadModal'
+import { YouTubeConnectModal } from '../components/YouTubeConnectModal'
 
 const RATIOS = [
   { key: '9:16', label: '9:16 Vertical', sub: 'Shorts, Reels & TikTok' },
@@ -73,10 +75,12 @@ export function Review() {
   const [rightTab, setRightTab] = useState<RightPanelTab>('words')
   const [error, setError] = useState<Error | null>(null)
 
-  // YouTube Upload Modal
+  // YouTube Upload Modal & Fallback Connect Modal
   const [showUploadModal, setShowUploadModal] = useState(false)
+  const [showConnectModal, setShowConnectModal] = useState(false)
   const [exportToUpload, setExportToUpload] = useState<JobExport | null>(null)
   const [ytStatus, setYtStatus] = useState<YouTubeChannelStatus | null>(null)
+  const [system, setSystem] = useState<SystemStatus | null>(null)
   const [uploadSuccessUrl, setUploadSuccessUrl] = useState<string | null>(null)
 
   // Claude Directing Modal
@@ -111,13 +115,14 @@ export function Review() {
   const loadJobData = useCallback(async () => {
     if (!jobId) return
     try {
-      const [j, c, s, exps, scr, yt] = await Promise.all([
+      const [j, c, s, exps, scr, yt, sys] = await Promise.all([
         api.getJob(jobId),
         api.listClips(jobId),
         api.captionStyles(),
         api.listJobExports(jobId).catch(() => []),
         api.listJobScripts(jobId).catch(() => []),
         api.getYouTubeStatus('default').catch(() => null),
+        api.system().catch(() => null),
       ])
       setJob(j)
       setClips(c)
@@ -125,6 +130,7 @@ export function Review() {
       setExportsList(exps)
       setScriptsList(scr)
       setYtStatus(yt)
+      setSystem(sys)
 
       if (c.length > 0 && !selectedClipId) {
         setSelectedClipId(c[0].id)
@@ -215,12 +221,16 @@ export function Review() {
     }
   }
 
-  // Trigger YouTube Modal
+  // Trigger YouTube Modal (or fallback connect dialog if disconnected)
   const openUploadModal = (exp?: JobExport) => {
     const target = exp || activeExport || exportsList[0]
     if (target) {
       setExportToUpload(target)
-      setShowUploadModal(true)
+      if (!ytStatus?.connected) {
+        setShowConnectModal(true)
+      } else {
+        setShowUploadModal(true)
+      }
     }
   }
 
@@ -391,18 +401,25 @@ export function Review() {
 
         {/* Top Studio Actions */}
         <div className="flex flex-wrap items-center gap-3">
-          {/* Claude MCP Prompt Button */}
-          <button
-            onClick={() => setShowClaudeModal(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50 px-4 py-2 text-xs font-bold text-purple-800 hover:bg-purple-100 transition-colors"
-          >
-            <Bot className="h-4 w-4 text-purple-700" />
-            <span>Direct with Claude MCP</span>
-          </button>
+          {/* Claude MCP Prompt Button - only show if Claude Desktop MCP is connected */}
+          {system?.claude_mcp_connected && (
+            <button
+              onClick={() => setShowClaudeModal(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50 px-4 py-2 text-xs font-bold text-purple-800 hover:bg-purple-100 transition-colors"
+            >
+              <Bot className="h-4 w-4 text-purple-700" />
+              <span>Direct with Claude MCP</span>
+            </button>
+          )}
 
           {/* Quick Upload Button */}
           <button
             onClick={() => openUploadModal()}
+            title={
+              ytStatus?.connected
+                ? 'Publish directly to YouTube channel'
+                : 'YouTube account not connected. Click for setup guide & instant MP4 download'
+            }
             className="inline-flex items-center gap-2 rounded-xl bg-purple-700 px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-purple-800 purple-glow transition-all"
           >
             <Upload className="h-4 w-4" />
@@ -1227,6 +1244,23 @@ export function Review() {
           }}
         />
       )}
+
+      {/* ---------------- YouTube Disconnected Fallback Dialog ---------------- */}
+      <YouTubeConnectModal
+        isOpen={showConnectModal}
+        onClose={() => setShowConnectModal(false)}
+        exportTitle={exportToUpload?.title}
+        onDownloadMp4={
+          exportToUpload
+            ? () => {
+                const a = document.createElement('a')
+                a.href = exportToUpload.download_url
+                a.download = `${exportToUpload.title || 'short'}.mp4`
+                a.click()
+              }
+            : undefined
+        }
+      />
     </div>
   )
 }

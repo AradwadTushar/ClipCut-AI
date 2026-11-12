@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, Link } from 'react-router-dom'
 import {
   Sparkles,
   Bot,
@@ -9,7 +9,7 @@ import {
   Terminal,
 } from 'lucide-react'
 
-import { formatDuration } from '../api'
+import { formatDuration, api, type SystemStatus } from '../api'
 import { useJobStream } from '../useJobStream'
 
 const STAGES = [
@@ -26,8 +26,13 @@ export function JobProgress() {
   const navigate = useNavigate()
   const { job, progress } = useJobStream(jobId)
 
+  const [system, setSystem] = useState<SystemStatus | null>(null)
   const [copiedId, setCopiedId] = useState(false)
   const [copiedPrompt, setCopiedPrompt] = useState(false)
+
+  useEffect(() => {
+    api.system().then(setSystem).catch(() => {})
+  }, [])
 
   // Redirect to review clips once job reaches done
   useEffect(() => {
@@ -150,68 +155,95 @@ export function JobProgress() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-          {/* Option A: Gemini Autonomous */}
-          <div className="rounded-2xl border border-canvas-300 bg-white p-6 shadow-sm flex flex-col justify-between space-y-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-purple-700 font-bold text-sm">
-                <Sparkles className="h-4 w-4" />
-                <span>Option A: Gemini Autonomous</span>
-              </div>
-              <p className="text-xs text-ink-600 leading-relaxed">
-                Gemini will automatically analyze the transcript, formulate 3 high-retention script angles,
-                pick the best viral cut, and render the vertical Short directly inside this window.
-              </p>
-            </div>
-            <div className="pt-2">
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                Running in background automatically
-              </span>
-            </div>
-          </div>
-
-          {/* Option B: Claude Desktop via MCP */}
-          <div className="rounded-2xl border-2 border-purple-500 bg-white p-6 shadow-sm flex flex-col justify-between space-y-4">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-purple-800 font-bold text-sm">
-                  <Terminal className="h-4 w-4" />
-                  <span>Option B: Claude Desktop (MCP)</span>
+        {system?.claude_mcp_connected ? (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            {/* Option A: Gemini Autonomous */}
+            <div className="rounded-2xl border border-canvas-300 bg-white p-6 shadow-sm flex flex-col justify-between space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-purple-700 font-bold text-sm">
+                  <Sparkles className="h-4 w-4" />
+                  <span>Option A: Gemini Autonomous</span>
                 </div>
-                <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-[10px] font-bold text-purple-700 uppercase">
-                  Pro Control
+                <p className="text-xs text-ink-600 leading-relaxed">
+                  Gemini will automatically analyze the transcript, formulate 3 high-retention script angles,
+                  pick the best viral cut, and render the vertical Short directly inside this window.
+                </p>
+              </div>
+              <div className="pt-2">
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                  Running in background automatically
                 </span>
               </div>
-              <p className="text-xs text-ink-600 leading-relaxed">
-                Open Claude Desktop, paste the prompt below, and collaborate with Claude to write,
-                critique, and render your video. Any renders Claude triggers show up here live!
-              </p>
+            </div>
 
-              {/* Copy Job ID Row */}
-              <div className="flex items-center justify-between rounded-xl border border-canvas-200 bg-canvas-100 px-3 py-2">
-                <span className="text-xs text-ink-500 font-mono">Job ID: {job.id}</span>
+            {/* Option B: Claude Desktop via MCP */}
+            <div className="rounded-2xl border-2 border-purple-500 bg-white p-6 shadow-sm flex flex-col justify-between space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-purple-800 font-bold text-sm">
+                    <Terminal className="h-4 w-4" />
+                    <span>Option B: Claude Desktop (MCP)</span>
+                  </div>
+                  <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-[10px] font-bold text-purple-700 uppercase">
+                    Pro Control
+                  </span>
+                </div>
+                <p className="text-xs text-ink-600 leading-relaxed">
+                  Open Claude Desktop, paste the prompt below, and collaborate with Claude to write,
+                  critique, and render your video. Any renders Claude triggers show up here live!
+                </p>
+
+                {/* Copy Job ID Row */}
+                <div className="flex items-center justify-between rounded-xl border border-canvas-200 bg-canvas-100 px-3 py-2">
+                  <span className="text-xs text-ink-500 font-mono">Job ID: {job.id}</span>
+                  <button
+                    type="button"
+                    onClick={copyJobId}
+                    className="flex items-center gap-1 text-xs font-semibold text-purple-700 hover:text-purple-900"
+                  >
+                    {copiedId ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                    <span>{copiedId ? 'Copied' : 'Copy ID'}</span>
+                  </button>
+                </div>
+
+                {/* Copy Claude Prompt Row */}
                 <button
                   type="button"
-                  onClick={copyJobId}
-                  className="flex items-center gap-1 text-xs font-semibold text-purple-700 hover:text-purple-900"
+                  onClick={copyPromptText}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-700 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-purple-800 transition-colors"
                 >
-                  {copiedId ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-                  <span>{copiedId ? 'Copied' : 'Copy ID'}</span>
+                  {copiedPrompt ? <Check className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
+                  <span>{copiedPrompt ? 'Prompt Copied to Clipboard!' : 'Copy Prompt for Claude Desktop'}</span>
                 </button>
               </div>
-
-              {/* Copy Claude Prompt Row */}
-              <button
-                type="button"
-                onClick={copyPromptText}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-700 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-purple-800 transition-colors"
-              >
-                {copiedPrompt ? <Check className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
-                <span>{copiedPrompt ? 'Prompt Copied to Clipboard!' : 'Copy Prompt for Claude Desktop'}</span>
-              </button>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="rounded-2xl border border-purple-200 bg-white p-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-purple-700 font-bold text-sm">
+                <Sparkles className="h-4 w-4" />
+                <span>Autonomous AI Director Active</span>
+              </div>
+              <p className="text-xs text-ink-600 max-w-xl leading-relaxed">
+                Gemini is automatically extracting timestamped viral hooks and rendering candidates.
+                Once complete, you will be seamlessly redirected to the Review Studio.
+              </p>
+            </div>
+            <div className="shrink-0 flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                Processing Automatically
+              </span>
+              <Link
+                to="/settings"
+                className="text-xs font-medium text-ink-500 hover:text-purple-700 underline"
+              >
+                Connect Claude MCP
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -293,6 +293,7 @@ export interface SystemStatus {
   gpu_name: string | null
   compute_type: string
   diarization_available: boolean
+  claude_mcp_connected?: boolean
 }
 
 export interface JobSettingsOverrides {
@@ -553,9 +554,14 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
-  getScheduleRecommendation: (timezoneOffsetMinutes?: number, dailyCap?: number, profile?: string) =>
+  getScheduleRecommendation: (
+    timezoneOffsetMinutes?: number,
+    dailyCap?: number,
+    profile?: string,
+    customSlots?: string,
+  ) =>
     request<ScheduleRecommendation>(
-      `/api/youtube/schedule/recommendation?timezone_offset_minutes=${timezoneOffsetMinutes ?? new Date().getTimezoneOffset()}&daily_cap=${dailyCap ?? 3}&profile=${profile || 'default'}`,
+      `/api/youtube/schedule/recommendation?timezone_offset_minutes=${timezoneOffsetMinutes ?? new Date().getTimezoneOffset()}&daily_cap=${dailyCap ?? 3}&profile=${profile || 'default'}${customSlots ? `&custom_slots=${encodeURIComponent(customSlots)}` : ''}`,
     ),
 
   getYouTubeStatus: (profile?: string) =>

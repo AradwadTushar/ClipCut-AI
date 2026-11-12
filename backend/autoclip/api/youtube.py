@@ -38,13 +38,16 @@ async def get_schedule_recommendation(
     timezone_offset_minutes: int = Query(0),
     daily_cap: int = Query(3),
     profile: str = Query("default"),
+    custom_slots: str | None = Query(None),
 ) -> dict[str, Any]:
     """Calculate optimal high-retention publishing slot for the next YouTube Short."""
+    slots_list = [s.strip() for s in custom_slots.split(",") if s.strip()] if custom_slots else None
     rec = await asyncio.to_thread(
         scheduler.calculate_next_optimal_slot,
         timezone_offset_minutes=timezone_offset_minutes,
         daily_cap=daily_cap,
         channel_profile=profile,
+        custom_slots=slots_list,
     )
     return {
         "recommended_iso": rec.recommended_iso,

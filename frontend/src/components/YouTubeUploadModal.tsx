@@ -64,10 +64,23 @@ export function YouTubeUploadModal({
       try {
         setLoadingSchedule(true)
         const tzOffset = -new Date().getTimezoneOffset()
+        const userCap = Number(localStorage.getItem('clipcut_daily_cap')) || 3
+        let customSlotsParam: string | undefined = undefined
+        try {
+          const savedSlotsRaw = localStorage.getItem('clipcut_custom_slots')
+          if (savedSlotsRaw) {
+            const arr = JSON.parse(savedSlotsRaw)
+            if (Array.isArray(arr) && arr.length > 0) {
+              customSlotsParam = arr.slice(0, userCap).join(',')
+            }
+          }
+        } catch {}
+
         const rec = await api.getScheduleRecommendation(
           tzOffset,
-          3,
-          channelStatus?.profile_name || 'default'
+          userCap,
+          channelStatus?.profile_name || 'default',
+          customSlotsParam,
         )
         if (mounted) {
           setRecommendation(rec)

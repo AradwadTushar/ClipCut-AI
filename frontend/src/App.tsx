@@ -1,8 +1,9 @@
 import { ClipCutLogo } from './components/ClipCutLogo'
 import { OnboardingModal } from './components/OnboardingModal'
+import { startInteractiveTour } from './components/InteractiveTour'
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, Link } from 'react-router-dom'
-import { Cpu, Sparkles } from 'lucide-react'
+import { Cpu, Sparkles, Compass } from 'lucide-react'
 
 import { api, type SystemStatus, type YouTubeChannelStatus } from './api'
 
@@ -34,43 +35,68 @@ export function App() {
         <div className="mx-auto flex max-w-[1600px] items-center justify-between px-6 py-3.5 lg:px-10">
           {/* Brand Logo */}
           <div className="flex items-center gap-8">
-            <NavLink to="/" className="group">
+            <NavLink to="/" id="brand-logo" className="group">
               <ClipCutLogo size="md" />
             </NavLink>
 
             {/* Main Nav Links */}
             <nav className="hidden items-center gap-1 sm:flex">
-              <TopLink to="/" end>
+              <TopLink id="nav-home" to="/" end>
                 Home
               </TopLink>
-              <TopLink to="/create">Create</TopLink>
-              <TopLink to="/history">History</TopLink>
-              <TopLink to="/analytics">Analytics</TopLink>
-              <TopLink to="/settings">Settings</TopLink>
+              <TopLink id="nav-create" to="/create">
+                Create
+              </TopLink>
+              <TopLink id="nav-history" to="/history">
+                History
+              </TopLink>
+              <TopLink id="nav-analytics" to="/analytics">
+                Analytics
+              </TopLink>
+              <TopLink id="nav-settings" to="/settings">
+                Settings
+              </TopLink>
             </nav>
           </div>
 
           {/* Right-Side Telemetry Badges */}
           <div className="flex items-center gap-2.5">
-            {/* Quick Tour Launcher */}
+            {/* Interactive Tour Launcher */}
+            <button
+              type="button"
+              onClick={startInteractiveTour}
+              className="inline-flex items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50/70 px-3 py-1 text-xs font-semibold text-purple-800 hover:bg-purple-100 transition-colors"
+              title="Launch interactive spotlight tour"
+            >
+              <Compass className="h-3.5 w-3.5 text-purple-600" />
+              <span>Tour</span>
+            </button>
+
+            {/* Quick Setup Wizard Launcher */}
             <button
               type="button"
               onClick={() => setShowOnboarding(true)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50/70 px-3 py-1 text-xs font-semibold text-purple-800 hover:bg-purple-100 transition-colors"
+              className="hidden lg:inline-flex items-center gap-1.5 rounded-full border border-canvas-200 bg-canvas-50 px-3 py-1 text-xs font-semibold text-ink-700 hover:bg-canvas-100 transition-colors"
               title="Launch feature walkthrough & API setup"
             >
               <Sparkles className="h-3.5 w-3.5 text-purple-600" />
-              <span>Quick Tour</span>
+              <span>Setup Guide</span>
             </button>
 
             {/* YouTube Channel Status Badge */}
             <Link
-              to="/analytics"
+              to="/settings"
               className="hidden items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50/80 px-3 py-1 text-xs font-semibold text-purple-800 transition-colors hover:bg-purple-100 md:inline-flex"
             >
-              <span className="h-2 w-2 rounded-full bg-red-600 animate-pulse" />
-              <span>{ytStatus?.title || 'YouTube'}:</span>
-              <span className="text-purple-600">{ytStatus?.custom_url || 'Connected'}</span>
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  ytStatus?.connected ? 'bg-red-600 animate-pulse' : 'bg-canvas-400'
+                }`}
+              />
+              <span>YouTube:</span>
+              <span className={ytStatus?.connected ? 'text-purple-700' : 'text-ink-500'}>
+                {ytStatus?.connected ? (ytStatus?.title || 'Connected') : 'Connect'}
+              </span>
             </Link>
 
             {/* CUDA GPU Telemetry Badge */}
@@ -137,14 +163,17 @@ export function App() {
 function TopLink({
   to,
   end,
+  id,
   children,
 }: {
   to: string
   end?: boolean
+  id?: string
   children: React.ReactNode
 }) {
   return (
     <NavLink
+      id={id}
       to={to}
       end={end}
       className={({ isActive }) =>

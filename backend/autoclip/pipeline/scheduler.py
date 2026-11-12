@@ -17,6 +17,8 @@ DEFAULT_SLOTS = [
     {"hour": 12, "minute": 0, "name": "Midday Lunch Peak (12:00 PM)", "key": "lunch"},
     {"hour": 17, "minute": 30, "name": "Post-Work / Commute Rush (5:30 PM)", "key": "rush"},
     {"hour": 20, "minute": 30, "name": "Night Prime Leisure (8:30 PM)", "key": "prime"},
+    {"hour": 9, "minute": 0, "name": "Morning Scroll (9:00 AM)", "key": "morning"},
+    {"hour": 15, "minute": 0, "name": "Afternoon Coffee Break (3:00 PM)", "key": "afternoon"},
 ]
 
 
@@ -36,6 +38,7 @@ def calculate_next_optimal_slot(
     timezone_offset_minutes: int = 0,
     daily_cap: int = 3,
     channel_profile: str = "default",
+    custom_slots: list[str] | None = None,
 ) -> SlotRecommendation:
     """Calculate the next available high-retention publishing slot.
 
@@ -45,10 +48,35 @@ def calculate_next_optimal_slot(
             We invert it to get positive offset: tz_delta = timedelta(minutes=-timezone_offset_minutes).
         daily_cap: Maximum recommended Shorts to publish per 24h window (default: 3).
         channel_profile: Target channel profile.
+        custom_slots: Optional list of custom slot times in "HH:MM" 24h format.
     """
     tz_delta = timedelta(minutes=-timezone_offset_minutes)
     client_tz = timezone(tz_delta)
     now_local = datetime.now(client_tz)
+
+    # Resolve active slots (from custom_slots or defaults)
+    active_slots: list[dict[str, Any]] = []
+    if custom_slots:
+        for idx, cs in enumerate(custom_slots[:daily_cap]):
+            try:
+                parts = cs.strip().split(":")
+                h, m = int(parts[0]), int(parts[1])
+                am_pm = "AM" if h < 12 else "PM"
+                disp_h = h % 12 or 12
+                active_slots.append({
+                    "hour": h,
+                    "minute": m,
+                    "name": f"Slot {idx + 1} ({disp_h}:{m:02d} {am_pm})",
+                    "key": f"slot_{idx + 1}",
+                })
+            except Exception:
+                pass
+
+    if not active_slots:
+        active_slots = DEFAULT_SLOTS[:daily_cap]
+    else:
+        # Sort chronologically by hour and minute
+        active_slots.sort(key=lambda s: s["hour"] * 60 + s["minute"])
 
     # 1. Inspect existing uploads from DB
     existing_uploads = store.list_all_youtube_uploads(limit=100)
@@ -86,7 +114,7 @@ def calculate_next_optimal_slot(
         if len(day_booked) >= daily_cap:
             continue
 
-        for slot_idx, slot in enumerate(DEFAULT_SLOTS[:daily_cap]):
+        for slot_idx, slot in enumerate(active_slots):
             candidate_dt = datetime(
                 year=target_date.year,
                 month=target_date.month,
