@@ -1,13 +1,13 @@
 @echo off
+setlocal enabledelayedexpansion
 title ClipCut AI - One-Click Updater
+
+cd /d "%~dp0"
+
 echo ======================================================================
 echo                     CLIPCUT AI ONE-CLICK UPDATER
 echo ======================================================================
 echo.
-
-if exist "autoclip" (
-    cd autoclip
-)
 
 echo [*] Pulling latest features from GitHub...
 git pull origin main
@@ -24,4 +24,3 @@ echo [+] ClipCut AI is fully up to date! Double-click run.bat to launch.
 echo ======================================================================
 echo.
 pause
-

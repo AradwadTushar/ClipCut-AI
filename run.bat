@@ -2,16 +2,14 @@
 setlocal enabledelayedexpansion
 title ClipCut AI Studio - Autonomous Video Engine
 
+:: 1. Ensure working directory is the script folder
+cd /d "%~dp0"
+
 echo ======================================================================
 echo                      CLIPCUT AI STUDIO
-echo       Autonomous Multi-Pipeline AI Video Engine for Shorts & Reels
+echo       Autonomous Multi-Pipeline AI Video Engine for Shorts and Reels
 echo ======================================================================
 echo.
-
-:: 1. Navigate to autoclip directory if running from repository root
-if exist "autoclip" (
-    cd autoclip
-)
 
 :: 2. Check Python installation
 where python >nul 2>&1
@@ -27,29 +25,29 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-:: 3. Check FFmpeg
+:: 3. Check FFmpeg installation
 where ffmpeg >nul 2>&1
 if %ERRORLEVEL% neq 0 (
-    echo [!] Warning: FFmpeg is not detected in your PATH.
-    echo ClipCut requires FFmpeg to slice and render videos.
+    echo [!] Warning: FFmpeg is not detected in your system PATH.
+    echo ClipCut requires FFmpeg to slice, caption, and render videos.
     echo.
     echo Attempting to install FFmpeg automatically via winget...
     winget install --id Gyan.FFmpeg -e --accept-source-agreements --accept-package-agreements
-    if %ERRORLEVEL% neq 0 (
-        echo [!] Could not auto-install FFmpeg. Please install FFmpeg from:
-        echo https://www.gyan.dev/ffmpeg/builds/
-        echo (or run: winget install Gyan.FFmpeg)
+    if !ERRORLEVEL! neq 0 (
+        echo [!] Could not auto-install FFmpeg.
+        echo Please download and install FFmpeg from https://www.gyan.dev/ffmpeg/builds/
+        echo or run: winget install Gyan.FFmpeg
         echo.
     ) else (
         echo [+] FFmpeg installed successfully!
     )
 )
 
-:: 4. Create and activate virtual environment if it doesn't exist
+:: 4. Create virtual environment if it does not exist
 if not exist ".venv\Scripts\activate.bat" (
     echo [*] First-time setup detected. Creating Python virtual environment...
     python -m venv .venv
-    if %ERRORLEVEL% neq 0 (
+    if !ERRORLEVEL! neq 0 (
         echo [X] Failed to create virtual environment. Please verify your Python installation.
         pause
         exit /b 1
@@ -58,10 +56,10 @@ if not exist ".venv\Scripts\activate.bat" (
     echo [*] Activating virtual environment...
     call .venv\Scripts\activate.bat
     
-    echo [*] Installing ClipCut AI dependencies (this takes 1-2 minutes on first run)...
+    echo [*] Installing ClipCut AI dependencies... This takes 1 to 2 minutes on first run.
     python -m pip install --upgrade pip
     pip install -e .
-    if %ERRORLEVEL% neq 0 (
+    if !ERRORLEVEL! neq 0 (
         echo [X] Failed to install dependencies. Please check your internet connection.
         pause
         exit /b 1
@@ -71,20 +69,20 @@ if not exist ".venv\Scripts\activate.bat" (
     call .venv\Scripts\activate.bat
 )
 
-:: 5. Launch Browser & Server
+:: 5. Launch ClipCut Studio Server and open browser
 echo.
 echo ======================================================================
 echo [*] Starting ClipCut Studio Server on http://localhost:8000 ...
 echo [*] Opening ClipCut in your default browser...
-echo [*] Press Ctrl+C in this window anytime to stop the server.
+echo [*] Press Ctrl+C in this terminal window anytime to stop the server.
 echo ======================================================================
 echo.
 
-:: Pop open the browser after a 2-second delay in background
-start "" cmd /c "timeout /t 2 /nobreak >nul & start http://localhost:8000"
+:: Launch via the virtual environment's python directly
+.venv\Scripts\python.exe -m autoclip.cli serve --open
 
-:: Start the FastAPI server
-autoclip serve --no-open
-
-pause
-
+if %ERRORLEVEL% neq 0 (
+    echo.
+    echo [X] Server stopped or exited with error code: %ERRORLEVEL%
+    pause
+)
