@@ -10,9 +10,20 @@ import {
   Calendar,
   AlertCircle,
   Film,
+  Bot,
+  Copy,
+  ExternalLink,
+  Code,
+  Zap,
 } from 'lucide-react'
 
-import { api, type ProviderStatus, type Settings as SettingsData, type SystemStatus } from '../api'
+import {
+  api,
+  type McpConfig,
+  type ProviderStatus,
+  type Settings as SettingsData,
+  type SystemStatus,
+} from '../api'
 
 const SECRET_LABELS: Record<string, string> = {
   gemini: 'Google Gemini API Key',
@@ -21,10 +32,66 @@ const SECRET_LABELS: Record<string, string> = {
   huggingface_token: 'HuggingFace Access Token',
 }
 
+const PROVIDER_METADATA: Record<
+  string,
+  {
+    label: string
+    desc: string
+    keyName: string
+    docsUrl: string
+    docsLabel: string
+    models: string[]
+    baseUrls?: { name: string; url: string }[]
+  }
+> = {
+  gemini: {
+    label: 'Google Gemini',
+    desc: 'High-speed viral detection. 100% free with no credit card required.',
+    keyName: 'gemini',
+    docsUrl: 'https://aistudio.google.com/app/apikey',
+    docsLabel: 'Get free key at Google AI Studio',
+    models: ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'],
+  },
+  anthropic: {
+    label: 'Anthropic Claude',
+    desc: 'Exceptional creative director reasoning, story structure, and pacing.',
+    keyName: 'anthropic',
+    docsUrl: 'https://console.anthropic.com/settings/keys',
+    docsLabel: 'Get key at Anthropic Console',
+    models: ['claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest'],
+  },
+  openai: {
+    label: 'OpenAI / Compatible',
+    desc: 'Compatible with OpenAI, OpenRouter, Groq, DeepSeek, and custom LLM servers.',
+    keyName: 'openai',
+    docsUrl: 'https://platform.openai.com/api-keys',
+    docsLabel: 'Get key at OpenAI / OpenRouter',
+    models: ['gpt-4o', 'gpt-4o-mini', 'deepseek-chat', 'llama-3.3-70b-versatile'],
+    baseUrls: [
+      { name: 'OpenAI Default', url: '' },
+      { name: 'OpenRouter', url: 'https://openrouter.ai/api/v1' },
+      { name: 'Groq (Fast)', url: 'https://api.groq.com/openai/v1' },
+      { name: 'Local Ollama', url: 'http://localhost:11434/v1' },
+    ],
+  },
+  ollama: {
+    label: 'Local Ollama',
+    desc: '100% offline and private. Runs directly on your hardware with no API keys.',
+    keyName: '',
+    docsUrl: 'https://ollama.com',
+    docsLabel: 'Install Ollama locally',
+    models: ['llama3.2', 'mistral', 'qwen2.5', 'phi3'],
+  },
+}
+
 export function Settings() {
   const [settings, setSettings] = useState<SettingsData | null>(null)
   const [providers, setProviders] = useState<ProviderStatus[]>([])
   const [system, setSystem] = useState<SystemStatus | null>(null)
+  const [mcpConfig, setMcpConfig] = useState<McpConfig | null>(null)
+  const [installingMcp, setInstallingMcp] = useState(false)
+  const [copiedMcpSnippet, setCopiedMcpSnippet] = useState(false)
+  const [showMcpSnippet, setShowMcpSnippet] = useState(false)
   const [error, setError] = useState<Error | null>(null)
   const [savedMessage, setSavedMessage] = useState<string | null>(null)
 
@@ -57,6 +124,29 @@ export function Settings() {
     void api.getSettings().then(setSettings).catch((e) => setError(e as Error))
     void api.providerStatus().then(setProviders).catch(() => undefined)
     void api.system().then(setSystem).catch(() => undefined)
+    void api.getMcpConfig().then(setMcpConfig).catch(() => undefined)
+  }
+
+  const handleInstallMcp = async () => {
+    setInstallingMcp(true)
+    setError(null)
+    try {
+      const res = await api.installMcpConfig()
+      setSavedMessage(res.message)
+      reload()
+      setTimeout(() => setSavedMessage(null), 5000)
+    } catch (err: any) {
+      setError(err as Error)
+    } finally {
+      setInstallingMcp(false)
+    }
+  }
+
+  const handleCopyMcp = () => {
+    if (!mcpConfig?.json_snippet) return
+    navigator.clipboard.writeText(mcpConfig.json_snippet)
+    setCopiedMcpSnippet(true)
+    setTimeout(() => setCopiedMcpSnippet(false), 2000)
   }
 
   useEffect(reload, [])
@@ -136,6 +226,7 @@ export function Settings() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {providers.map((p) => {
             const isSelected = p.name === settings.active_provider
+            const meta = PROVIDER_METADATA[p.name]
             return (
               <div
                 key={p.name}
@@ -147,14 +238,26 @@ export function Settings() {
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-sm capitalize text-ink-950">{p.name}</span>
+                  <span className="font-bold text-sm capitalize text-ink-950">
+                    {meta?.label || p.name}
+                  </span>
                   {isSelected && <Check className="h-4 w-4 text-purple-700" />}
                 </div>
-                <div className="mt-2 flex items-center gap-1.5 text-[11px]">
-                  <span className={`h-2 w-2 rounded-full ${p.available ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                  <span className={p.available ? 'font-semibold text-emerald-800' : 'text-amber-800'}>
-                    {p.available ? 'Connected' : p.detail || 'Unavailable'}
-                  </span>
+                <p className="mt-1 text-[11px] text-ink-500 leading-snug line-clamp-2">
+                  {meta?.desc || 'LLM reasoning adapter'}
+                </p>
+                <div className="mt-3 flex items-center justify-between text-[11px]">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`h-2 w-2 rounded-full ${p.available ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                    <span className={p.available ? 'font-semibold text-emerald-800' : 'text-amber-800'}>
+                      {p.available ? 'Ready' : p.detail || 'Needs Key'}
+                    </span>
+                  </div>
+                  {p.has_key && (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full">
+                      Key Saved
+                    </span>
+                  )}
                 </div>
               </div>
             )
@@ -164,9 +267,11 @@ export function Settings() {
         {/* Model & Base URL Inputs */}
         <div className="grid grid-cols-1 gap-5 pt-2 sm:grid-cols-2">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-ink-700">
-              Model Name ({settings.active_provider})
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold uppercase tracking-wider text-ink-700">
+                Model Name ({PROVIDER_METADATA[settings.active_provider]?.label || settings.active_provider})
+              </label>
+            </div>
             <input
               type="text"
               value={settings.providers[settings.active_provider]?.model ?? ''}
@@ -183,6 +288,36 @@ export function Settings() {
               placeholder="e.g. gemini-2.0-flash or claude-3-5-sonnet-latest"
               className="mt-1.5 w-full rounded-xl border border-canvas-300 bg-canvas-50 px-3.5 py-2.5 text-xs text-ink-900 focus:border-purple-600 focus:bg-white focus:outline-none"
             />
+
+            {/* Quick Model Presets */}
+            {PROVIDER_METADATA[settings.active_provider]?.models && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] font-bold uppercase text-ink-400">Presets:</span>
+                {PROVIDER_METADATA[settings.active_provider].models.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() =>
+                      patch({
+                        providers: {
+                          [settings.active_provider]: {
+                            ...settings.providers[settings.active_provider],
+                            model: m,
+                          },
+                        },
+                      })
+                    }
+                    className={`rounded-lg px-2 py-0.5 text-[10px] font-mono transition-colors ${
+                      settings.providers[settings.active_provider]?.model === m
+                        ? 'bg-purple-700 text-white font-bold'
+                        : 'bg-canvas-200 text-ink-700 hover:bg-canvas-300'
+                    }`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>
@@ -205,8 +340,158 @@ export function Settings() {
               placeholder="e.g. OpenRouter, Groq, or http://localhost:11434"
               className="mt-1.5 w-full rounded-xl border border-canvas-300 bg-canvas-50 px-3.5 py-2.5 text-xs text-ink-900 focus:border-purple-600 focus:bg-white focus:outline-none"
             />
+
+            {/* Quick Base URL Presets */}
+            {PROVIDER_METADATA[settings.active_provider]?.baseUrls && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] font-bold uppercase text-ink-400">Endpoints:</span>
+                {PROVIDER_METADATA[settings.active_provider].baseUrls!.map((b) => (
+                  <button
+                    key={b.name}
+                    type="button"
+                    onClick={() =>
+                      patch({
+                        providers: {
+                          [settings.active_provider]: {
+                            ...settings.providers[settings.active_provider],
+                            base_url: b.url || null,
+                          },
+                        },
+                      })
+                    }
+                    className={`rounded-lg px-2 py-0.5 text-[10px] transition-colors ${
+                      (settings.providers[settings.active_provider]?.base_url ?? '') === b.url
+                        ? 'bg-purple-700 text-white font-bold'
+                        : 'bg-canvas-200 text-ink-700 hover:bg-canvas-300'
+                    }`}
+                  >
+                    {b.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Inline API Key Saver for Active Provider */}
+        {PROVIDER_METADATA[settings.active_provider]?.keyName ? (
+          <div className="border-t border-canvas-200 pt-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Key className="h-4 w-4 text-purple-700" />
+                <span className="text-xs font-bold text-ink-900">
+                  {PROVIDER_METADATA[settings.active_provider].label} API Key
+                </span>
+              </div>
+              <a
+                href={PROVIDER_METADATA[settings.active_provider].docsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-bold text-purple-700 hover:underline"
+              >
+                <span>{PROVIDER_METADATA[settings.active_provider].docsLabel}</span>
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+            <ModernSecretField
+              secretKey={PROVIDER_METADATA[settings.active_provider].keyName}
+              label={SECRET_LABELS[PROVIDER_METADATA[settings.active_provider].keyName]}
+              present={settings.keys_present[PROVIDER_METADATA[settings.active_provider].keyName] ?? false}
+              onChanged={reload}
+              onError={setError}
+            />
+          </div>
+        ) : (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-900 flex items-center gap-2">
+            <Check className="h-4 w-4 text-emerald-600 shrink-0" />
+            <span>Ollama runs 100% locally and requires no API key or internet connection.</span>
+          </div>
+        )}
+      </div>
+
+      {/* ---------------- CARD 2: Claude Desktop MCP Integration ---------------- */}
+      <div className="rounded-3xl border border-canvas-300 bg-white p-6 shadow-sm sm:p-8 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-purple-700">
+              <Bot className="h-4 w-4" />
+              <span>Model Context Protocol (MCP)</span>
+            </div>
+            <h3 className="mt-1 text-lg font-bold text-ink-950">Claude Desktop Integration</h3>
+            <p className="text-xs text-ink-500">
+              Control ClipCut directly from Claude Desktop. Direct video hooks, inspect transcripts, and iterate scripts from chat.
+            </p>
+          </div>
+
+          <div className="shrink-0 flex items-center gap-2">
+            {mcpConfig?.connected ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                Claude Desktop Connected
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+                <span className="h-2 w-2 rounded-full bg-amber-500" />
+                Not Connected
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={handleInstallMcp}
+            disabled={installingMcp}
+            className="inline-flex items-center gap-2 rounded-xl bg-purple-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-purple-800 transition-colors disabled:opacity-50"
+          >
+            <Zap className="h-4 w-4" />
+            <span>{installingMcp ? 'Configuring...' : '1-Click Auto-Configure Claude Desktop'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleCopyMcp}
+            className="inline-flex items-center gap-2 rounded-xl border border-canvas-300 bg-canvas-50 px-4 py-2.5 text-xs font-semibold text-ink-800 hover:bg-white transition-colors"
+          >
+            {copiedMcpSnippet ? (
+              <Check className="h-4 w-4 text-emerald-600" />
+            ) : (
+              <Copy className="h-4 w-4 text-purple-700" />
+            )}
+            <span>{copiedMcpSnippet ? 'Copied Config JSON!' : 'Copy Config JSON'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowMcpSnippet(!showMcpSnippet)}
+            className="text-xs font-semibold text-purple-700 hover:underline inline-flex items-center gap-1"
+          >
+            <Code className="h-3.5 w-3.5" />
+            <span>{showMcpSnippet ? 'Hide Details' : 'View Config Snippet & Path'}</span>
+          </button>
+        </div>
+
+        {/* Expandable Snippet Box */}
+        {showMcpSnippet && (
+          <div className="rounded-2xl border border-canvas-200 bg-canvas-50 p-4 space-y-3 text-xs animate-in fade-in duration-150">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-ink-600">
+              <span className="font-semibold">Claude Desktop Config Path:</span>
+              <span className="font-mono text-[11px] text-purple-700 font-bold select-all break-all">
+                {mcpConfig?.config_path || '%APPDATA%\\Claude\\claude_desktop_config.json'}
+              </span>
+            </div>
+
+            <pre className="rounded-xl border border-canvas-200 bg-white p-3 font-mono text-[11px] text-ink-800 overflow-x-auto select-all leading-relaxed">
+              {mcpConfig?.json_snippet || 'Loading config snippet...'}
+            </pre>
+
+            <p className="text-[11px] text-ink-500">
+              💡 After clicking <strong>Auto-Configure</strong> or saving the snippet, completely quit and restart Claude Desktop. The tools icon will appear in your Claude input bar!
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ---------------- CARD 2: Smart YouTube Cadence & Scheduling ---------------- */}

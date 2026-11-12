@@ -287,3 +287,18 @@ class SystemOut(BaseModel):
     compute_type: str
     diarization_available: bool
     claude_mcp_connected: bool = False
+
+
+class McpConfigOut(BaseModel):
+    connected: bool
+    config_path: str
+    config_exists: bool
+    command: str
+    args: list[str]
+    json_snippet: str
+
+
+class McpInstallOut(BaseModel):
+    success: bool
+    message: str
+    config_path: str

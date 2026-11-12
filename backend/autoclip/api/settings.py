@@ -10,7 +10,15 @@ from fastapi import APIRouter, HTTPException
 from .. import config, models, system
 from ..providers import PROVIDERS, build_provider
 from ..providers.base import ProviderStatus
-from .schemas import ProviderStatusOut, SecretIn, SettingsIn, SettingsOut, SystemOut
+from .schemas import (
+    McpConfigOut,
+    McpInstallOut,
+    ProviderStatusOut,
+    SecretIn,
+    SettingsIn,
+    SettingsOut,
+    SystemOut,
+)
 
 log = logging.getLogger(__name__)
 
@@ -128,6 +136,96 @@ async def providers_status() -> list[ProviderStatusOut]:
         )
 
     return list(await asyncio.gather(*(check(name) for name in PROVIDERS)))
+
+
+def _get_claude_desktop_config_path() -> tuple[Path, bool]:
+    import os
+    import sys
+    from pathlib import Path
+
+    if sys.platform == "win32":
+        appdata = os.environ.get("APPDATA")
+        primary = Path(appdata) / "Claude" / "claude_desktop_config.json" if appdata else Path.home() / "AppData" / "Roaming" / "Claude" / "claude_desktop_config.json"
+        alt = Path(os.path.expandvars(r"%LOCALAPPDATA%\Claude-Data\claude_pzs8sxrjxfjjc\claude_desktop_config.json"))
+        if alt.exists() and not primary.exists():
+            return alt, True
+        return primary, primary.exists()
+    elif sys.platform == "darwin":
+        primary = Path.home() / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
+        return primary, primary.exists()
+    else:
+        primary = Path.home() / ".config" / "Claude" / "claude_desktop_config.json"
+        return primary, primary.exists()
+
+
+@router.get("/system/mcp-config", response_model=McpConfigOut)
+async def get_mcp_config() -> McpConfigOut:
+    import json
+    import sys
+
+    config_path, exists = _get_claude_desktop_config_path()
+    connected = _check_claude_mcp_connected()
+    python_exe = sys.executable
+    args = ["-m", "autoclip.mcp.server"]
+
+    snippet_obj = {
+        "mcpServers": {
+            "clipcut": {
+                "command": python_exe,
+                "args": args,
+            }
+        }
+    }
+    json_snippet = json.dumps(snippet_obj, indent=2)
+
+    return McpConfigOut(
+        connected=connected,
+        config_path=str(config_path),
+        config_exists=exists,
+        command=python_exe,
+        args=args,
+        json_snippet=json_snippet,
+    )
+
+
+@router.post("/system/mcp-install", response_model=McpInstallOut)
+async def install_mcp_config() -> McpInstallOut:
+    import json
+    import sys
+
+    config_path, _ = _get_claude_desktop_config_path()
+    python_exe = sys.executable
+    args = ["-m", "autoclip.mcp.server"]
+
+    try:
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        data: dict = {}
+        if config_path.exists():
+            try:
+                data = json.loads(config_path.read_text(encoding="utf-8"))
+            except Exception:
+                data = {}
+        if not isinstance(data, dict):
+            data = {}
+
+        servers = data.setdefault("mcpServers", {})
+        if not isinstance(servers, dict):
+            servers = {}
+            data["mcpServers"] = servers
+
+        servers["clipcut"] = {
+            "command": python_exe,
+            "args": args,
+        }
+
+        config_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        return McpInstallOut(
+            success=True,
+            message="ClipCut MCP successfully configured in Claude Desktop! Please restart Claude Desktop to activate.",
+            config_path=str(config_path),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to write Claude Desktop configuration: {exc}")
 
 
 def _check_claude_mcp_connected() -> bool:

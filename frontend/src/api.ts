@@ -296,6 +296,21 @@ export interface SystemStatus {
   claude_mcp_connected?: boolean
 }
 
+export interface McpConfig {
+  connected: boolean
+  config_path: string
+  config_exists: boolean
+  command: string
+  args: string[]
+  json_snippet: string
+}
+
+export interface McpInstallResult {
+  success: boolean
+  message: string
+  config_path: string
+}
+
 export interface JobSettingsOverrides {
   provider?: string
   whisper_model?: string
@@ -357,6 +372,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   health: () => request<{ status: string; version: string }>('/api/health'),
   system: () => request<SystemStatus>('/api/system'),
+  getMcpConfig: () => request<McpConfig>('/api/system/mcp-config'),
+  installMcpConfig: () => request<McpInstallResult>('/api/system/mcp-install', { method: 'POST' }),
   fetchModels: () => request<void>('/api/system/models', { method: 'POST' }),
 
   listSources: () => request<Source[]>('/api/sources'),
