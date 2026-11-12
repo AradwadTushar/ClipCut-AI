@@ -14,6 +14,7 @@ Transform long-form YouTube videos and podcasts into captivating 9:16 vertical c
 [![MCP Protocol](https://img.shields.io/badge/MCP-Claude%20Desktop%20Stdio-orange.svg)](https://modelcontextprotocol.io/)
 
 [Key Features](#key-features) •
+[Quick Download](#instant-download--launch) •
 [Architecture](#system-architecture) •
 [The 3 Pipelines](#the-3-video-generation-pipelines) •
 [Claude Desktop MCP](#directing-via-claude-desktop-mcp) •
@@ -22,6 +23,25 @@ Transform long-form YouTube videos and podcasts into captivating 9:16 vertical c
 [License](#credits--license)
 
 </div>
+
+---
+
+## Instant Download & Launch
+
+ClipCut AI comes with pre-compiled production assets. Zero Node.js or development toolchains required.
+
+1. **Download:** Click **[Download Latest ClipCut ZIP](https://github.com/AradwadTushar/ClipCut-AI/archive/refs/heads/main.zip)** and extract the archive to your computer.
+2. **Launch:**
+   - **Windows:** Double-click `run.bat`.
+   - **macOS / Linux:** Run `./run.sh` in terminal.
+3. **Start Creating:** The app automatically sets up dependencies and opens `http://localhost:8000` in your browser with an interactive tour and setup guide.
+
+Alternatively, developers can clone via Git:
+```bash
+git clone https://github.com/AradwadTushar/ClipCut-AI.git
+cd ClipCut-AI
+run.bat  # On Windows, or ./run.sh on macOS/Linux
+```
 
 ---
 
