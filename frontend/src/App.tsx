@@ -2,12 +2,13 @@ import { ClipCutLogo } from './components/ClipCutLogo'
 import { OnboardingModal } from './components/OnboardingModal'
 import { startInteractiveTour } from './components/InteractiveTour'
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet, Link } from 'react-router-dom'
+import { NavLink, Outlet, Link, useNavigate } from 'react-router-dom'
 import { Cpu, Sparkles, Compass } from 'lucide-react'
 
 import { api, type SystemStatus, type YouTubeChannelStatus } from './api'
 
 export function App() {
+  const navigate = useNavigate()
   const [system, setSystem] = useState<SystemStatus | null>(null)
   const [ytStatus, setYtStatus] = useState<YouTubeChannelStatus | null>(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
@@ -64,7 +65,7 @@ export function App() {
             {/* Interactive Tour Launcher */}
             <button
               type="button"
-              onClick={startInteractiveTour}
+              onClick={() => startInteractiveTour(navigate)}
               className="inline-flex items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50/70 px-3 py-1 text-xs font-semibold text-purple-800 hover:bg-purple-100 transition-colors"
               title="Launch interactive spotlight tour"
             >

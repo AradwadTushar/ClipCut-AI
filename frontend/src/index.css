@@ -151,3 +151,223 @@
   color: #7c3aed;
   border: 1px solid #ddd6fe;
 }
+
+/* --------------------------------------------------------------------------
+   Driver.js Custom ClipCut Studio Tour Theme
+   Snow White & Royal Purple High-Luminance Aesthetic
+   -------------------------------------------------------------------------- */
+
+/* Active Stage Highlight Box */
+.driver-stage {
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.4), 0 10px 30px rgba(124, 58, 237, 0.25) !important;
+  border-radius: 16px !important;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Dimmer Overlay */
+.driver-overlay {
+  background: rgba(15, 23, 42, 0.72) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+}
+
+/* Popover Card (Global Driver.js + Custom Class) */
+.driver-popover,
+.driver-popover.clipcut-tour-popover {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1.5px solid #e2e8f0 !important;
+  border-radius: 20px !important;
+  box-shadow: 0 25px 50px -12px rgba(124, 58, 237, 0.25), 0 0 0 1px rgba(124, 58, 237, 0.08) !important;
+  padding: 22px 24px !important;
+  max-width: 380px !important;
+  min-width: 300px !important;
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  animation: driver-popover-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+@keyframes driver-popover-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Title */
+.driver-popover .driver-popover-title,
+.driver-popover.clipcut-tour-popover .driver-popover-title {
+  font-size: 17px !important;
+  font-weight: 800 !important;
+  color: #0a0910 !important;
+  letter-spacing: -0.02em !important;
+  line-height: 1.35 !important;
+  margin: 0 0 8px 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+/* Purple indicator dot next to title */
+.driver-popover .driver-popover-title::before,
+.driver-popover.clipcut-tour-popover .driver-popover-title::before {
+  content: "" !important;
+  display: inline-block !important;
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 9999px !important;
+  background: #7c3aed !important;
+  box-shadow: 0 0 8px #7c3aed !important;
+  flex-shrink: 0 !important;
+}
+
+/* Description */
+.driver-popover .driver-popover-description,
+.driver-popover.clipcut-tour-popover .driver-popover-description {
+  font-size: 13px !important;
+  line-height: 1.6 !important;
+  color: #475569 !important;
+  font-weight: 450 !important;
+  margin: 0 !important;
+}
+
+/* Close Button */
+.driver-popover .driver-popover-close-btn,
+.driver-popover.clipcut-tour-popover .driver-popover-close-btn {
+  top: 14px !important;
+  right: 14px !important;
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 10px !important;
+  color: #94a3b8 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 16px !important;
+  transition: all 0.15s ease !important;
+  background: transparent !important;
+  cursor: pointer !important;
+}
+
+.driver-popover .driver-popover-close-btn:hover,
+.driver-popover.clipcut-tour-popover .driver-popover-close-btn:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+/* Footer Section */
+.driver-popover .driver-popover-footer,
+.driver-popover.clipcut-tour-popover .driver-popover-footer {
+  margin-top: 20px !important;
+  padding-top: 14px !important;
+  border-top: 1px solid #f1f5f9 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+}
+
+/* Progress Pill (e.g. 1 OF 6) */
+.driver-popover .driver-popover-progress-text,
+.driver-popover.clipcut-tour-popover .driver-popover-progress-text {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #7c3aed !important;
+  background: #f5f3ff !important;
+  border: 1px solid #ddd6fe !important;
+  padding: 3px 9px !important;
+  border-radius: 9999px !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+}
+
+/* Navigation Buttons Container */
+.driver-popover .driver-popover-navigation-btns,
+.driver-popover.clipcut-tour-popover .driver-popover-navigation-btns {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+/* Common Button Styles */
+.driver-popover .driver-popover-footer-btn,
+.driver-popover.clipcut-tour-popover .driver-popover-footer-btn {
+  font-family: var(--font-sans), sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  padding: 7px 14px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  outline: none !important;
+  line-height: 1.4 !important;
+}
+
+/* Back Button */
+.driver-popover .driver-popover-prev-btn,
+.driver-popover.clipcut-tour-popover .driver-popover-prev-btn {
+  background: #f8fafc !important;
+  color: #475569 !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+.driver-popover .driver-popover-prev-btn:hover,
+.driver-popover.clipcut-tour-popover .driver-popover-prev-btn:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Next / Finish Button */
+.driver-popover .driver-popover-next-btn,
+.driver-popover.clipcut-tour-popover .driver-popover-next-btn {
+  background: #7c3aed !important;
+  color: #ffffff !important;
+  border: 1px solid #7c3aed !important;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3) !important;
+}
+
+.driver-popover .driver-popover-next-btn:hover,
+.driver-popover.clipcut-tour-popover .driver-popover-next-btn:hover {
+  background: #6d28d9 !important;
+  border-color: #6d28d9 !important;
+  box-shadow: 0 6px 18px rgba(124, 58, 237, 0.45) !important;
+  transform: translateY(-1px) !important;
+}
+
+.driver-popover .driver-popover-next-btn:active,
+.driver-popover.clipcut-tour-popover .driver-popover-next-btn:active {
+  transform: translateY(0) !important;
+}
+
+/* Arrow pointer */
+.driver-popover .driver-popover-arrow,
+.driver-popover.clipcut-tour-popover .driver-popover-arrow {
+  border-width: 8px !important;
+}
+
+.driver-popover .driver-popover-arrow-side-top,
+.driver-popover.clipcut-tour-popover .driver-popover-arrow-side-top {
+  border-top-color: #ffffff !important;
+}
+
+.driver-popover .driver-popover-arrow-side-bottom,
+.driver-popover.clipcut-tour-popover .driver-popover-arrow-side-bottom {
+  border-bottom-color: #ffffff !important;
+}
+
+.driver-popover .driver-popover-arrow-side-left,
+.driver-popover.clipcut-tour-popover .driver-popover-arrow-side-left {
+  border-left-color: #ffffff !important;
+}
+
+.driver-popover .driver-popover-arrow-side-right,
+.driver-popover.clipcut-tour-popover .driver-popover-arrow-side-right {
+  border-right-color: #ffffff !important;
+}
