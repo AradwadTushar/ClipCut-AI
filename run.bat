@@ -5,6 +5,11 @@ title ClipCut AI Studio - Autonomous Video Engine
 :: 1. Ensure working directory is the script folder
 cd /d "%~dp0"
 
+:: Check if launched in silent background mode
+set "IS_SILENT=0"
+if "%1"=="--silent" set "IS_SILENT=1"
+if "%2"=="--silent" set "IS_SILENT=1"
+
 echo ======================================================================
 echo                      CLIPCUT AI STUDIO
 echo       Autonomous Multi-Pipeline AI Video Engine for Shorts and Reels
@@ -163,11 +168,20 @@ if not exist ".venv\Scripts\activate.bat" (
     )
 )
 
-:: 6. Launch ClipCut Studio Server and open browser
+:: 6. Register Desktop and Windows Start Menu shortcuts
+if not exist "%USERPROFILE%\Desktop\ClipCut AI Studio.lnk" (
+    echo [*] Registering Desktop and Start Menu shortcuts...
+    cscript //nologo "%~dp0scripts\create_shortcuts.vbs" >nul 2>&1
+    if exist "%USERPROFILE%\Desktop\ClipCut AI Studio.lnk" (
+        echo [+] Pinned ClipCut AI Studio to Desktop and Start Menu!
+    )
+)
+
+:: 7. Launch ClipCut Studio Server and open native app window
 echo.
 echo ======================================================================
 echo [*] Starting ClipCut Studio Server on http://localhost:8000 ...
-echo [*] Opening ClipCut in your default browser...
+echo [*] Launching ClipCut dedicated desktop window...
 echo [*] Press Ctrl+C in this terminal window anytime to stop the server.
 echo ======================================================================
 echo.
@@ -178,5 +192,5 @@ echo.
 if errorlevel 1 (
     echo.
     echo [X] Server stopped or exited with error code: %ERRORLEVEL%
-    pause
+    if !IS_SILENT! equ 0 pause
 )

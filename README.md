@@ -32,9 +32,11 @@ ClipCut AI comes with pre-compiled production assets. Zero Node.js or developmen
 
 1. **Download:** Click **[Download Latest ClipCut ZIP](https://github.com/AradwadTushar/ClipCut-AI/archive/refs/heads/main.zip)** and extract the archive to your computer.
 2. **Launch:**
-   - **Windows:** Double-click `run.bat`.
+   - **Windows:** Double-click `run.bat` (or double-click `ClipCut.vbs` for silent background launch).
    - **macOS / Linux:** Run `./run.sh` in terminal.
-3. **Start Creating:** The app automatically sets up dependencies and opens `http://localhost:8000` in your browser with an interactive tour and setup guide.
+3. **Start Creating:** The app automatically launches in a dedicated native desktop window (no browser clutter or URL bar), pins **ClipCut AI Studio** directly to your **Desktop** and **Windows Start Menu**, and starts the interactive tour.
+
+From then on, you never need to open the folder again—just launch **ClipCut AI Studio** directly from your Start Menu or Desktop!
 
 Alternatively, developers can clone via Git:
 ```bash

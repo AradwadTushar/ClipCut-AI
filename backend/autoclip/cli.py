@@ -628,6 +628,66 @@ def update_ytdlp() -> None:
         console.print("[green]Update complete.[/green]")
 
 
+def _launch_desktop_window(url: str) -> None:
+    """Launch the app in a dedicated native borderless window."""
+    import os
+    import shutil
+    import subprocess
+    import sys
+    import webbrowser
+
+    if sys.platform == "win32":
+        candidates = [
+            shutil.which("msedge"),
+            shutil.which("chrome"),
+            os.path.expandvars(r"%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"),
+            os.path.expandvars(r"%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"),
+            os.path.expandvars(r"%ProgramFiles%\Google\Chrome\Application\chrome.exe"),
+            os.path.expandvars(r"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"),
+            os.path.expandvars(r"%LocalAppData%\Google\Chrome\Application\chrome.exe"),
+        ]
+        for exe in candidates:
+            if exe and os.path.isfile(exe):
+                try:
+                    subprocess.Popen(
+                        [exe, f"--app={url}", "--window-size=1360,860"],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    return
+                except Exception:
+                    pass
+    elif sys.platform == "darwin":
+        for app in ("Google Chrome", "Microsoft Edge", "Brave Browser"):
+            try:
+                res = subprocess.run(
+                    ["open", "-na", app, "--args", f"--app={url}"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                )
+                if res.returncode == 0:
+                    return
+            except Exception:
+                pass
+    elif sys.platform.startswith("linux"):
+        for binary in ("google-chrome", "chromium", "chromium-browser", "microsoft-edge"):
+            exe = shutil.which(binary)
+            if exe:
+                try:
+                    subprocess.Popen(
+                        [exe, f"--app={url}", "--window-size=1360,860"],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    return
+                except Exception:
+                    pass
+
+    # Universal fallback if no browser supports app mode
+    webbrowser.open(url)
+
+
 @app.command()
 def serve(
     host: str = typer.Option("127.0.0.1", "--host", help="Interface to bind."),
@@ -639,7 +699,6 @@ def serve(
 ) -> None:
     """Start the AutoClip web app."""
     import threading
-    import webbrowser
 
     import uvicorn
 
@@ -666,7 +725,7 @@ def serve(
 
     if open_browser and not reload:
         # Delayed so the browser doesn't race the server's first bind.
-        threading.Timer(1.5, lambda: webbrowser.open(url)).start()
+        threading.Timer(1.5, lambda: _launch_desktop_window(url)).start()
 
     uvicorn.run(
         "autoclip.app:app",
